@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Management</title>
+    <script>
+        const userRole = localStorage.getItem('userRole');
+        if (userRole !== 'Admin') {
+            alert('Access Denied. Only permanent Admin can manage products.');
+            window.location.href = 'orders.html';
+        }
+    </script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .bg-cafe { background-color: #5d4037 !important; }
+        .product-image { max-width: 50px; max-height: 50px; object-fit: cover; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-cafe shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="#">☕ POS Admin</a>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link" href="dashboard.html">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="orders.html">Orders</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="product_management.html">Products</a></li>
+                    <li class="nav-item"><a class="nav-link" href="reports.html">Reports</a></li>
+                </ul>
+                <a href="login.html" class="btn btn-outline-light" onclick="localStorage.removeItem('userRole')">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h2 class="mb-4 text-primary border-bottom pb-2">Menu and Product Management</h2>
+
+        <div class="card my-4 shadow-lg border-0">
+            <div class="card-header bg-primary text-white"><h4>Add New Menu Item</h4></div>
+            <div class="card-body">
+                <form action="#" method="POST" class="needs-validation" novalidate> 
+                    <div class="row g-3">
+                        <div class="col-md-3"><label for="product_name" class="form-label">Name</label><input type="text" class="form-control" name="product_name" required></div>
+                        <div class="col-md-3"><label for="category" class="form-label">Category</label>
+                            <select class="form-select" name="category" required>
+                                <option selected disabled value="">Choose...</option>
+                                <option>Coffee</option>
+                                <option>Tea</option>
+                                <option>Juice</option>
+                                <option>Pastry</option>
+                                <option>Meal</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2"><label for="price" class="form-label">Price (₱)</label><input type="number" step="0.01" class="form-control" name="price" required></div>
+                        <div class="col-md-3"><label for="image_url" class="form-label">Image URL</label><input type="text" class="form-control" name="image_url"></div>
+                        <div class="col-md-1 d-flex align-items-end"><button type="submit" class="btn btn-success w-100">Add (Simulated)</button></div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <h3 class="mt-5 text-secondary">Current Menu Items (Simulated Data)</h3>
+        <div class="card shadow-lg border-0">
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="bg-light">
+                        <tr><th>Image</th><th>ID</th><th>Name</th><th>Category</th><th>Price (₱)</th><th>Actions (CRUD)</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><img src="https://images.unsplash.com/photo-1579998632688-6623d24e12e7?w=50&h=50&fit=crop" alt="Latte" class="product-image"></td>
+                            <td>1</td><td class="fw-bold">Latte</td><td>Coffee</td><td>₱150.00</td>
+                            <td><button class="btn btn-sm btn-outline-primary me-2">Edit</button><button class="btn btn-sm btn-outline-danger">Delete</button></td>
+                        </tr>
+                        <tr>
+                            <td><img src="https://images.unsplash.com/photo-1588691888463-5e729a67a0a6?w=50&h=50&fit=crop" alt="Croissant" class="product-image"></td>
+                            <td>2</td><td class="fw-bold">Croissant</td><td>Pastry</td><td>₱95.00</td>
+                            <td><button class="btn btn-sm btn-outline-primary me-2">Edit</button><button class="btn btn-sm btn-outline-danger">Delete</button></td>
+                        </tr>
+                         <tr>
+                            <td><img src="https://images.unsplash.com/photo-1563222396-7a8779b5c777?w=50&h=50&fit=crop" alt="Iced Tea" class="product-image"></td>
+                            <td>4</td><td class="fw-bold">Iced Tea</td><td>Tea</td><td>₱80.00</td>
+                            <td><button class="btn btn-sm btn-outline-primary me-2">Edit</button><button class="btn btn-sm btn-outline-danger">Delete</button></td>
+                        </tr>
+                         <tr>
+                            <td><img src="https://images.unsplash.com/photo-1598075765620-ab6453f22146?w=50&h=50&fit=crop" alt="Orange Juice" class="product-image"></td>
+                            <td>9</td><td class="fw-bold">Fresh Orange Juice</td><td>Juice</td><td>₱110.00</td>
+                            <td><button class="btn btn-sm btn-outline-primary me-2">Edit</button><button class="btn btn-sm btn-outline-danger">Delete</button></td>
+                        </tr>
+                        <tr>
+                            <td><img src="https://images.unsplash.com/photo-1551888252-825595c52ae3?w=50&h=50&fit=crop" alt="Spaghetti" class="product-image"></td>
+                            <td>10</td><td class="fw-bold">Spaghetti Bolognese</td><td>Meal</td><td>₱280.00</td>
+                            <td><button class="btn btn-sm btn-outline-primary me-2">Edit</button><button class="btn btn-sm btn-outline-danger">Delete</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

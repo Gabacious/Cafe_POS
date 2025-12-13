@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Café POS - Order System (Pesos)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; } 
+        .bg-cafe { background-color: #5d4037 !important; } 
+        .menu-item { 
+            cursor: pointer; 
+            transition: transform 0.2s, box-shadow 0.2s; 
+            border: 1px solid #e0e0e0; 
+            background-color: white;
+            border-radius: 8px;
+        }
+        .menu-item:hover { transform: scale(1.03); box-shadow: 0 8px 16px rgba(0,0,0,0.2) !important; } 
+        .product-image { 
+            width: 100%; 
+            height: 120px; 
+            object-fit: cover; 
+            border-top-left-radius: 8px; 
+            border-top-right-radius: 8px; 
+        }
+        
+        @media print {
+            body * { visibility: hidden; }
+            #receipt-modal-content, #receipt-modal-content * { visibility: visible; }
+            #receipt-modal-content { position: absolute; left: 0; top: 0; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-cafe shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="#">☕ Café POS (<span id="userRoleDisplay">Guest</span>)</a>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="navLinks">
+                    </ul>
+                <div class="d-flex">
+                    <button id="adminOverrideBtn" class="btn btn-sm btn-warning me-2 d-none" onclick="requestAdminOverride()">Admin Override</button>
+                    <a href="login.html" class="btn btn-outline-light" onclick="localStorage.clear()">Logout</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-lg-8">
+                <h3 class="mb-4 text-secondary">Menu Selection</h3>
+                
+                <div class="mb-4 row align-items-center bg-white p-3 shadow-sm rounded">
+                    <label for="categoryFilter" class="col-auto col-form-label fw-bold text-dark">Filter by Category:</label>
+                    <div class="col-md-4 col-lg-3">
+                        <select id="categoryFilter" class="form-select" onchange="filterMenu()">
+                            <option value="All">All Categories</option>
+                            <option value="Coffee">Coffee</option>
+                            <option value="Tea">Tea</option>
+                            <option value="Juice">Juice</option>
+                            <option value="Pastry">Pastry</option>
+                            <option value="Meal">Meal</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row" id="menu-container">
+                    </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card shadow-lg sticky-top" style="top: 20px;">
+                    <div class="card-header bg-primary text-white"><h5>Current Order</h5></div>
+                    <div class="card-body">
+                        <div class="mb-3 p-3 bg-light rounded border border-warning">
+                            <label class="form-label fw-bold text-danger">Apply Discount (Admin Access Required):</label>
+                            
+                            <div class="form-check">
+                                <input class="form-check-input discount-radio" type="radio" name="discountRadio" id="noDiscount" value="0" checked onchange="updateUI()">
+                                <label class="form-check-label" for="noDiscount">No Discount</label>
+                            </div>
+                            
+                            <div class="form-check">
+                                <input class="form-check-input discount-radio" type="radio" name="discountRadio" id="scPwdDiscount" value="0.20" onchange="updateUI()" disabled>
+                                <label class="form-check-label text-danger" for="scPwdDiscount">20% Senior Citizen / PWD</label>
+                            </div>
+
+                            <div class="form-check">
+                                <input class="form-check-input discount-radio" type="radio" name="discountRadio" id="promoDiscount" value="0.10" onchange="updateUI()" disabled>
+                                <label class="form-check-label text-success" for="promoDiscount">10% Standard Promo</label>
+                            </div>
+                        </div>
+
+                        <ul id="cart-list" class="list-group list-group-flush mb-3 border rounded">
+                            <li class="list-group-item text-muted text-center py-4">Order is empty.</li>
+                        </ul>
+                        
+                        <div class="d-flex justify-content-between p-1"><strong>Subtotal:</strong><span>₱<span id="subtotal-price">0.00</span></span></div>
+                        <div class="d-flex justify-content-between mt-1 p-1 border-bottom"><strong>Applied Discount:</strong><span>₱<span id="discount-amount" class="text-danger">0.00</span></span></div>
+                        <div class="d-flex justify-content-between fs-4 fw-bold text-primary mt-2 p-1"><strong>TOTAL:</strong><strong>₱<span id="total-price">0.00</span></strong></div>
+                        
+                        <button class="btn btn-success btn-lg w-100 mt-3" onclick="processPayment()">Process Payment</button>
+                        <button class="btn btn-outline-secondary w-100 mt-2" onclick="clearOrder()">Clear Order</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const menuItems = [
+            { id: 1, name: 'Latte', category: 'Coffee', price: 150.00, image: 'https://images.unsplash.com/photo-1579998632688-6623d24e12e7?w=500&h=120&fit=crop' },
+            { id: 3, name: 'Espresso', category: 'Coffee', price: 120.00, image: 'https://images.unsplash.com/photo-1541167760496-1d1624f22971?w=500&h=120&fit=crop' },
+            { id: 5, name: 'Americano', category: 'Coffee', price: 130.00, image: 'https://images.unsplash.com/photo-1550005809-906dd2d2e1a3?w=500&h=120&fit=crop' },
+            { id: 7, name: 'Hot Chocolate', category: 'Coffee', price: 140.00, image: 'https://images.unsplash.com/photo-1525287313076-231dd93b8908?w=500&h=120&fit=crop' },
+            
+            { id: 2, name: 'Croissant', category: 'Pastry', price: 95.00, image: 'https://images.unsplash.com/photo-1588691888463-5e729a67a0a6?w=500&h=120&fit=crop' },
+            { id: 6, name: 'Blueberry Muffin', category: 'Pastry', price: 110.00, image: 'https://images.unsplash.com/photo-1596791443653-29a8a7281f6c?w=500&h=120&fit=crop' },
+            
+            { id: 4, name: 'Iced Tea', category: 'Tea', price: 80.00, image: 'https://images.unsplash.com/photo-1563222396-7a8779b5c777?w=500&h=120&fit=crop' },
+            
+            { id: 9, name: 'Fresh Orange Juice', category: 'Juice', price: 110.00, image: 'https://images.unsplash.com/photo-1598075765620-ab6453f22146?w=500&h=120&fit=crop' },
+            
+            { id: 8, name: 'Club Sandwich', category: 'Meal', price: 220.00, image: 'https://images.unsplash.com/photo-1628464654922-b5e580e227e9?w=500&h=120&fit=crop' },
+            { id: 10, name: 'Spaghetti Bolognese', category: 'Meal', price: 280.00, image: 'https://images.unsplash.com/photo-1551888252-825595c52ae3?w=500&h=120&fit=crop' }
+        ];
+
+        let cart = {};
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAccessAndRenderNav();
+            renderMenu();
+            updateUI();
+        });
+
+
+        function filterMenu() {
+            const category = document.getElementById('categoryFilter').value;
+            renderMenu(category);
+        }
+
+        function renderMenu(filterCategory = 'All') {
+            const container = document.getElementById('menu-container');
+            container.innerHTML = '';
+            
+            const filteredItems = filterCategory === 'All' 
+                ? menuItems 
+                : menuItems.filter(item => item.category === filterCategory);
+
+            if (filteredItems.length === 0) {
+                 container.innerHTML = '<div class="col-12"><p class="text-muted text-center py-5 border rounded bg-white">No items found in this category.</p></div>';
+            } else {
+                filteredItems.forEach(item => {
+                    const card = `
+                        <div class="col-md-3 col-sm-6 mb-4">
+                            <div class="card menu-item shadow-sm" 
+                                onclick="addToCart(${item.id}, '${item.name}', ${item.price})">
+                                <img src="${item.image}" class="card-img-top product-image" alt="${item.name}">
+                                <div class="card-body text-center p-2">
+                                    <h6 class="card-title mb-0 fw-bold">${item.name}</h6>
+                                    <p class="card-text text-primary mb-0">₱${item.price.toFixed(2)}</p>
+                                    <small class="text-muted">${item.category}</small>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += card;
+                });
+            }
+        }
+        
+
+        function setDiscountControlsDisabled(isDisabled) {
+            const radios = document.querySelectorAll('.discount-radio');
+            radios.forEach(radio => {
+                if (radio.id !== 'noDiscount') {
+                    radio.disabled = isDisabled;
+                }
+            });
+
+            if (isDisabled) {
+                document.getElementById('noDiscount').checked = true;
+                updateUI();
+            }
+        }
+
+        function checkAccessAndRenderNav() {
+            const userRole = localStorage.getItem('userRole');
+            const tempAccess = localStorage.getItem('tempAdminAccess') === 'true';
+
+            if (!userRole) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            document.getElementById('userRoleDisplay').textContent = userRole + (tempAccess ? ' (Override Active)' : '');
+            const navLinks = document.getElementById('navLinks');
+            
+            const hasDiscountAccess = userRole === 'Admin' || tempAccess;
+            setDiscountControlsDisabled(!hasDiscountAccess);
+            
+            const overrideBtn = document.getElementById('adminOverrideBtn');
+            if (userRole === 'Cashier' && !tempAccess) {
+                overrideBtn.classList.remove('d-none');
+            } else {
+                overrideBtn.classList.add('d-none');
+            }
+
+            let links = '';
+
+            if (userRole === 'Admin') { 
+                links += `<li class="nav-item"><a class="nav-link" href="dashboard.html">Dashboard</a></li>`;
+            }
+
+            links += '<li class="nav-item"><a class="nav-link active" href="orders.html">Orders</a></li>';
+
+            // 3. Products and Reports (Admin only)
+            if (userRole === 'Admin') { 
+                links += `
+                    <li class="nav-item"><a class="nav-link" href="product_management.html">Products</a></li>
+                    <li class="nav-item"><a class="nav-link" href="reports.html">Reports</a></li>
+                `;
+            }
+
+            navLinks.innerHTML = links;
+        }
+        
+        function requestAdminOverride() {
+            const adminUsername = prompt("Enter Admin Username for Override:");
+            const adminPassword = prompt("Enter Admin Password for Override:");
+            
+            if (adminUsername === 'admin' && adminPassword === 'adminpass') {
+                localStorage.setItem('tempAdminAccess', 'true');
+                alert("Admin override granted for this transaction. Discounts are now enabled. Admin links are restricted to permanent Admin role only.");
+                checkAccessAndRenderNav();
+            } else {
+                alert("Invalid Admin credentials. Access denied.");
+            }
+        }
+
+
+        function updateUI() {
+            const list = document.getElementById('cart-list');
+            list.innerHTML = '';
+            let subtotal = 0;
+
+            if (Object.keys(cart).length === 0) {
+                 list.innerHTML = '<li class="list-group-item text-muted text-center py-4">Order is empty.</li>';
+            } else {
+                for (const id in cart) {
+                    const item = cart[id];
+                    const itemTotal = item.price * item.quantity;
+                    subtotal += itemTotal;
+                    
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item d-flex justify-content-between align-items-center p-2';
+                    li.innerHTML = `
+                        <div>${item.name} (${item.quantity}x)<small class="text-muted d-block">₱${item.price.toFixed(2)} ea</small></div>
+                        <div class="d-flex align-items-center">
+                            <strong>₱${itemTotal.toFixed(2)}</strong>
+                            <button class="btn btn-sm btn-danger ms-2 p-0 px-1" onclick="removeFromCart(${id})">-</button>
+                        </div>
+                    `;
+                    list.appendChild(li);
+                }
+            }
+            
+            const selectedDiscountRadio = document.querySelector('input[name="discountRadio"]:checked');
+            const discountRate = selectedDiscountRadio ? parseFloat(selectedDiscountRadio.value) : 0;
+            
+            const discount = subtotal * discountRate;
+            const finalTotal = subtotal - discount;
+            
+            document.getElementById('subtotal-price').innerText = subtotal.toFixed(2);
+            document.getElementById('discount-amount').innerText = discount.toFixed(2);
+            document.getElementById('total-price').innerText = finalTotal.toFixed(2);
+        }
+        
+        function addToCart(id, name, price) {
+            if (cart[id]) {
+                cart[id].quantity += 1;
+            } else {
+                cart[id] = { id, name, price, quantity: 1 };
+            }
+            updateUI();
+        }
+        function removeFromCart(id) {
+            if (cart[id] && cart[id].quantity > 1) {
+                cart[id].quantity -= 1;
+            } else {
+                delete cart[id];
+            }
+            updateUI();
+        }
+
+        function clearOrder() {
+            cart = {};
+            document.getElementById('noDiscount').checked = true;
+            document.getElementById('categoryFilter').value = 'All';
+            localStorage.removeItem('tempAdminAccess');
+            checkAccessAndRenderNav();
+            renderMenu();
+            updateUI();
+        }
+
+        function processPayment() {
+            if (Object.keys(cart).length === 0) {
+                alert("Cannot process payment. The order is empty.");
+                return;
+            }
+            
+            const totalDisplay = document.getElementById('total-price').innerText;
+            const paid = prompt(`Order Total: ₱${totalDisplay}. Enter customer payment amount in Pesos:`);
+            
+            if (paid !== null && !isNaN(parseFloat(paid))) {
+                const total = parseFloat(totalDisplay);
+                const paymentAmount = parseFloat(paid);
+                
+                if (paymentAmount >= total) {
+                    const change = paymentAmount - total;
+                    alert(`Payment successful! Change Due: ₱${change.toFixed(2)}`);
+                    
+                    printReceipt(total, paymentAmount, change);
+                    
+                    clearOrder(); 
+                } else {
+                    alert(`❌ Payment failed. Insufficient amount.`);
+                }
+            } else if (paid !== null) {
+                alert("Invalid payment amount entered.");
+            }
+        }
+        
+        function printReceipt(total, paid, change) {
+            const date = new Date().toLocaleString();
+            const userRole = localStorage.getItem('userRole');
+            
+            let subtotal = 0;
+            for (const id in cart) {
+                subtotal += cart[id].price * cart[id].quantity;
+            }
+            
+            const selectedDiscountRadio = document.querySelector('input[name="discountRadio"]:checked');
+            const discountRate = selectedDiscountRadio ? parseFloat(selectedDiscountRadio.value) : 0;
+            const discount = subtotal * discountRate;
+
+            let discountLabel = (discountRate * 100).toFixed(0) + '%';
+            if (discountRate === 0.20) discountLabel = "SC/PWD 20%";
+            if (discountRate === 0.10) discountLabel = "Promo 10%";
+            if (discountRate === 0) discountLabel = "None";
+
+
+            let receiptContent = `
+                <div style="width: 300px; padding: 10px; font-family: monospace; font-size: 12px; margin: 0 auto;">
+                    <h4 style="text-align: center; margin-bottom: 5px;">CAFÉ POS RECEIPT</h4>
+                    <div style="text-align: center; border-bottom: 1px dashed black; padding-bottom: 5px; margin-bottom: 10px;">
+                        <p style="margin: 0;">Transaction Date: ${date}</p>
+                        <p style="margin: 0;">Cashier: ${userRole}</p>
+                    </div>
+                    
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
+                        <thead>
+                            <tr style="border-bottom: 1px dashed black;">
+                                <th style="text-align: left;">ITEM</th>
+                                <th style="text-align: right;">QTY</th>
+                                <th style="text-align: right;">TOTAL (₱)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            for (const id in cart) {
+                const item = cart[id];
+                const itemTotal = item.price * item.quantity;
+                
+                receiptContent += `
+                            <tr>
+                                <td style="text-align: left;">${item.name}</td>
+                                <td style="text-align: right;">${item.quantity}</td>
+                                <td style="text-align: right;">${itemTotal.toFixed(2)}</td>
+                            </tr>
+                `;
+            }
+
+            receiptContent += `
+                        </tbody>
+                    </table>
+                    
+                    <div style="border-top: 1px dashed black; padding-top: 5px;">
+                        <p style="margin: 0; display: flex; justify-content: space-between;"><span>Subtotal:</span><span>₱${subtotal.toFixed(2)}</span></p>
+                        <p style="margin: 0; display: flex; justify-content: space-between;"><span>Discount (${discountLabel}):</span><span>-₱${discount.toFixed(2)}</span></p>
+                        <p style="margin: 0; display: flex; justify-content: space-between; font-weight: bold;"><span>TOTAL:</span><span>₱${total.toFixed(2)}</span></p>
+                    </div>
+                    
+                    <div style="border-top: 1px dashed black; padding-top: 5px; margin-top: 10px;">
+                        <p style="margin: 0; display: flex; justify-content: space-between;"><span>CASH PAID:</span><span>₱${paid.toFixed(2)}</span></p>
+                        <p style="margin: 0; display: flex; justify-content: space-between; font-weight: bold;"><span>CHANGE:</span><span>₱${change.toFixed(2)}</span></p>
+                    </div>
+                    
+                    <p style="text-align: center; margin-top: 15px;">** THANK YOU FOR YOUR ORDER! **</p>
+                </div>
+            `;
+            
+            const printWindow = window.open('', '', 'height=600,width=400');
+            printWindow.document.write('<html><head><title>Receipt</title></head><body>');
+            printWindow.document.write(receiptContent);
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.focus();
+            printWindow.print();
+        }
+    </script>
+</body>
+</html>
