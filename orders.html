@@ -6,16 +6,16 @@
     <title>Café POS - Order System (Pesos)</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f8f9fa; } 
-        .bg-cafe { background-color: #5d4037 !important; } 
+        body { background-color: #f8f9fa; } /* Lighter overall background */
+        .bg-cafe { background-color: #5d4037 !important; } /* Darker, richer coffee color for the navbar */
         .menu-item { 
             cursor: pointer; 
             transition: transform 0.2s, box-shadow 0.2s; 
             border: 1px solid #e0e0e0; 
             background-color: white;
-            border-radius: 8px;
+            border-radius: 8px; /* Slightly rounded corners */
         }
-        .menu-item:hover { transform: scale(1.03); box-shadow: 0 8px 16px rgba(0,0,0,0.2) !important; } 
+        .menu-item:hover { transform: scale(1.03); box-shadow: 0 8px 16px rgba(0,0,0,0.2) !important; } /* Stronger hover effect */
         .product-image { 
             width: 100%; 
             height: 120px; 
@@ -24,6 +24,30 @@
             border-top-right-radius: 8px; 
         }
         
+        /* Styles for the new Options Panel */
+        .options-panel-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1050; /* Above Bootstrap card/navbar */
+        }
+        .options-panel-content {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        /* Styles for printing the receipt */
         @media print {
             body * { visibility: hidden; }
             #receipt-modal-content, #receipt-modal-content * { visibility: visible; }
@@ -39,7 +63,6 @@
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="navLinks">
                     </ul>
                 <div class="d-flex">
-                    <button id="adminOverrideBtn" class="btn btn-sm btn-warning me-2 d-none" onclick="requestAdminOverride()">Admin Override</button>
                     <a href="login.html" class="btn btn-outline-light" onclick="localStorage.clear()">Logout</a>
                 </div>
             </div>
@@ -90,6 +113,11 @@
                                 <input class="form-check-input discount-radio" type="radio" name="discountRadio" id="promoDiscount" value="0.10" onchange="updateUI()" disabled>
                                 <label class="form-check-label text-success" for="promoDiscount">10% Standard Promo</label>
                             </div>
+                            
+                            <div id="adminOverrideContainer" class="mt-3 pt-3 border-top d-none">
+                                <button id="adminOverrideBtn" class="btn btn-sm btn-warning w-100" onclick="requestAdminOverride()">Request Admin Override</button>
+                            </div>
+                            
                         </div>
 
                         <ul id="cart-list" class="list-group list-group-flush mb-3 border rounded">
@@ -108,34 +136,68 @@
         </div>
     </div>
     
+    <div id="options-panel-overlay" class="options-panel-overlay">
+        <div id="options-panel-content" class="options-panel-content">
+            </div>
+    </div>
+    
     <script>
+        // --- CONSTANTS AND INITIALIZATION ---
+        
+        // Size options for DRINKS (Coffee, Tea, Juice)
+        const DRINK_SIZES = {
+            'small': { displayName: 'Small (12 oz)', priceMultiplier: 0.8 }, 
+            'medium': { displayName: 'Medium (16 oz)', priceMultiplier: 1.0 }, // Base Price
+            'large': { displayName: 'Large (20 oz)', priceMultiplier: 1.2 } 
+        };
+        
+        // Size options for FOOD (Meals)
+        const FOOD_SIZES = {
+            'single': { displayName: 'Single', priceMultiplier: 1.0 }, // Base Price
+            'share': { displayName: 'To Share', priceMultiplier: 1.8 } // 80% increase
+        };
+
         const menuItems = [
-            { id: 1, name: 'Latte', category: 'Coffee', price: 150.00, image: 'https://images.unsplash.com/photo-1579998632688-6623d24e12e7?w=500&h=120&fit=crop' },
-            { id: 3, name: 'Espresso', category: 'Coffee', price: 120.00, image: 'https://images.unsplash.com/photo-1541167760496-1d1624f22971?w=500&h=120&fit=crop' },
-            { id: 5, name: 'Americano', category: 'Coffee', price: 130.00, image: 'https://images.unsplash.com/photo-1550005809-906dd2d2e1a3?w=500&h=120&fit=crop' },
-            { id: 7, name: 'Hot Chocolate', category: 'Coffee', price: 140.00, image: 'https://images.unsplash.com/photo-1525287313076-231dd93b8908?w=500&h=120&fit=crop' },
+            // Coffee Category 
+            { id: 1, name: 'Latte', category: 'Coffee', price: 150.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://images.immediate.co.uk/production/volatile/sites/30/2020/08/iced-latte-30188f7.jpg?quality=90&webp=true&resize=440,400' },
+            { id: 3, name: 'Espresso', category: 'Coffee', price: 120.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://www.wyseguide.com/wp-content/uploads/2025/07/Shaken-Espresso-011-600x600.jpg' },
+            { id: 5, name: 'Americano', category: 'Coffee', price: 130.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://assets.beanbox.com/blog_images/AB7ud4YSE6nmOX0iGlgA.jpeg' },
+            { id: 7, name: 'Hot Chocolate', category: 'Coffee', price: 140.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://assets.epicurious.com/photos/61eb09dfb37c8d2963dd7bde/1:1/w_1280,c_limit/HotCocoaForOne_RECIPE_012022_086_VOG_final.jpg' },
             
-            { id: 2, name: 'Croissant', category: 'Pastry', price: 95.00, image: 'https://images.unsplash.com/photo-1588691888463-5e729a67a0a6?w=500&h=120&fit=crop' },
-            { id: 6, name: 'Blueberry Muffin', category: 'Pastry', price: 110.00, image: 'https://images.unsplash.com/photo-1596791443653-29a8a7281f6c?w=500&h=120&fit=crop' },
+            // Pastry Category - No size/temp needed
+            { id: 2, name: 'Croissant', category: 'Pastry', price: 95.00, isDrink: false, needsTemp: false, needsFoodSize: false, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Croissant-Petr_Kratochvil.jpg/960px-Croissant-Petr_Kratochvil.jpg' },
+            { id: 6, name: 'Muffin', category: 'Pastry', price: 110.00, isDrink: false, needsTemp: false, needsFoodSize: false, image: 'https://hostessatheart.com/wp-content/uploads/2018/02/Basic-Homemade-Muffin-Recipe-2-682x1024.jpg' },
             
-            { id: 4, name: 'Iced Tea', category: 'Tea', price: 80.00, image: 'https://images.unsplash.com/photo-1563222396-7a8779b5c777?w=500&h=120&fit=crop' },
+            // Tea Category 
+            { id: 4, name: 'Regular Tea', category: 'Tea', price: 80.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://sudachirecipes.com/wp-content/uploads/2025/03/royal-milk-tea-thumb-550x550.png' },
             
-            { id: 9, name: 'Fresh Orange Juice', category: 'Juice', price: 110.00, image: 'https://images.unsplash.com/photo-1598075765620-ab6453f22146?w=500&h=120&fit=crop' },
+            // Juice Category - Only needs size
+            { id: 9, name: 'Fresh Orange Juice', category: 'Juice', price: 110.00, isDrink: true, needsTemp: false, needsFoodSize: false, image: 'https://cdn2.foodviva.com/static-content/food-images/juice-recipes/orange-pineapple-juice-recipe/orange-pineapple-juice-recipe.jpg' },
             
-            { id: 8, name: 'Club Sandwich', category: 'Meal', price: 220.00, image: 'https://images.unsplash.com/photo-1628464654922-b5e580e227e9?w=500&h=120&fit=crop' },
-            { id: 10, name: 'Spaghetti Bolognese', category: 'Meal', price: 280.00, image: 'https://images.unsplash.com/photo-1551888252-825595c52ae3?w=500&h=120&fit=crop' }
+            // Meal Category - Needs food size (portion)
+            { id: 8, name: 'Club Sandwich', category: 'Meal', price: 220.00, isDrink: false, needsTemp: false, needsFoodSize: true, image: 'https://ichef.bbci.co.uk/food/ic/food_16x9_1600/recipes/club_sandwich_16496_16x9.jpg' },
+            { id: 10, name: 'Spaghetti', category: 'Meal', price: 280.00, isDrink: false, needsTemp: false, needsFoodSize: true, image: 'https://img.taste.com.au/WiSuiqrj/w643-h428-cfill-q90/taste/2024/03/5-ingredient-turbo-charged-spaghetti-recipe-196959-1-jpg-218232-1.jpg' }
         ];
 
         let cart = {};
 
         document.addEventListener('DOMContentLoaded', () => {
             checkAccessAndRenderNav();
-            renderMenu();
+            renderMenu(); // Renders all initially
             updateUI();
+            
+            // Allow clicking the overlay to close the panel
+            document.getElementById('options-panel-overlay').addEventListener('click', function(event) {
+                if (event.target.id === 'options-panel-overlay') {
+                    hideOptionsPanel();
+                }
+            });
         });
 
+        // --- MENU RENDERING AND OPTIONS PANEL LOGIC ---
 
         function filterMenu() {
+            hideOptionsPanel(); // Close panel if menu changes
             const category = document.getElementById('categoryFilter').value;
             renderMenu(category);
         }
@@ -152,14 +214,29 @@
                  container.innerHTML = '<div class="col-12"><p class="text-muted text-center py-5 border rounded bg-white">No items found in this category.</p></div>';
             } else {
                 filteredItems.forEach(item => {
+                    // Determine click handler: show options panel for drinks/meals, or add directly for others
+                    const needsOptions = item.isDrink || item.needsFoodSize;
+                    const clickHandler = needsOptions 
+                        ? `addItemWithOptionsCheck(${item.id})` 
+                        : `addToCart('${item.id}', '${item.name}', ${item.price})`;
+                        
+                    // Determine starting price display (use small for drinks, single for food, base price for pastries)
+                    let startingPrice;
+                    if (item.isDrink) {
+                        startingPrice = 'Starting from ₱' + (item.price * DRINK_SIZES.small.priceMultiplier).toFixed(2);
+                    } else if (item.needsFoodSize) {
+                        startingPrice = 'Starting from ₱' + (item.price * FOOD_SIZES.single.priceMultiplier).toFixed(2);
+                    } else {
+                        startingPrice = '₱' + item.price.toFixed(2);
+                    }
+                        
                     const card = `
                         <div class="col-md-3 col-sm-6 mb-4">
-                            <div class="card menu-item shadow-sm" 
-                                onclick="addToCart(${item.id}, '${item.name}', ${item.price})">
+                            <div class="card menu-item shadow-sm" onclick="${clickHandler}">
                                 <img src="${item.image}" class="card-img-top product-image" alt="${item.name}">
                                 <div class="card-body text-center p-2">
                                     <h6 class="card-title mb-0 fw-bold">${item.name}</h6>
-                                    <p class="card-text text-primary mb-0">₱${item.price.toFixed(2)}</p>
+                                    <p class="card-text text-primary mb-0">${startingPrice}</p>
                                     <small class="text-muted">${item.category}</small>
                                 </div>
                             </div>
@@ -170,6 +247,211 @@
             }
         }
         
+        function addItemWithOptionsCheck(id) {
+            const item = menuItems.find(i => i.id === id);
+            if (!item) return;
+
+            // Only render panel if options are needed (isDrink or needsFoodSize)
+            if (item.isDrink || item.needsFoodSize) {
+                renderOptionsPanel(item.id);
+            } else {
+                // Fallback for items without options (should be handled in renderMenu, but safe here)
+                addToCart(item.id.toString(), item.name, item.price);
+            }
+        }
+
+        function hideOptionsPanel() {
+            document.getElementById('options-panel-overlay').style.display = 'none';
+        }
+
+        function renderOptionsPanel(id) {
+            const item = menuItems.find(i => i.id === id);
+            if (!item) return;
+
+            const panelContent = document.getElementById('options-panel-content');
+            
+            // Determine the relevant size options, default selection, and label based on item type
+            let sizeOptions = {};
+            let defaultSizeKey = '';
+            let sizeLabel = '';
+            
+            if (item.isDrink) {
+                sizeOptions = DRINK_SIZES;
+                defaultSizeKey = 'medium';
+                sizeLabel = 'Size (Oz):';
+            } else if (item.needsFoodSize) {
+                sizeOptions = FOOD_SIZES;
+                defaultSizeKey = 'single';
+                sizeLabel = 'Portion:';
+            } else {
+                // Item does not require options, shouldn't be here.
+                return;
+            }
+            
+            let html = `
+                <h4 class="mb-3">${item.name} Options</h4>
+                <input type="hidden" id="selected-item-id" value="${item.id}">
+                <input type="hidden" id="item-type-key" value="${item.isDrink ? 'drink' : 'food'}">
+                
+                <div class="mb-3 text-start">
+                    <label for="size-select" class="form-label fw-bold">${sizeLabel}</label>
+                    <select id="size-select" class="form-select mb-2" onchange="updatePanelPrice(${item.id})">
+            `;
+            
+            // Size/Portion Dropdown options
+            for (const sizeKey in sizeOptions) {
+                const size = sizeOptions[sizeKey];
+                const price = (item.price * size.priceMultiplier).toFixed(2);
+                html += `<option value="${sizeKey}" data-price="${price}" ${sizeKey === defaultSizeKey ? 'selected' : ''}>
+                    ${size.displayName} (₱${price})
+                </option>`;
+            }
+            
+            html += `
+                    </select>
+                </div>
+            `;
+            
+            // Temperature Dropdown (only for Coffee/Tea)
+            if (item.needsTemp) {
+                html += `
+                    <div class="mb-3 text-start">
+                        <label for="temp-select" class="form-label fw-bold">Temperature:</label>
+                        <select id="temp-select" class="form-select">
+                            <option value="hot" selected>Hot</option>
+                            <option value="iced">Iced</option>
+                        </select>
+                    </div>
+                `;
+            } else {
+                 html += `<input type="hidden" id="temp-select" value="none">`;
+            }
+
+            // Current Total and Buttons
+            const defaultPrice = (item.price * sizeOptions[defaultSizeKey].priceMultiplier).toFixed(2);
+            html += `
+                <div class="d-flex justify-content-between align-items-center mt-4 border-top pt-3">
+                    <h5 class="mb-0">TOTAL: ₱<span id="panel-final-price">${defaultPrice}</span></h5>
+                    <div>
+                        <button class="btn btn-outline-danger me-2" onclick="hideOptionsPanel()">Cancel</button>
+                        <button class="btn btn-primary" onclick="addToCartFromPanel(${item.id})">Add to Order</button>
+                    </div>
+                </div>
+            `;
+
+            panelContent.innerHTML = html;
+            document.getElementById('options-panel-overlay').style.display = 'flex';
+        }
+        
+        function updatePanelPrice(id) {
+            const item = menuItems.find(i => i.id === id);
+            if (!item) return;
+            
+            const sizeSelect = document.getElementById('size-select');
+            const selectedOption = sizeSelect.options[sizeSelect.selectedIndex];
+            
+            const finalPrice = selectedOption.getAttribute('data-price');
+            document.getElementById('panel-final-price').innerText = finalPrice;
+        }
+
+
+        function addToCartFromPanel(id) {
+            const item = menuItems.find(i => i.id === id);
+            if (!item) {
+                hideOptionsPanel();
+                return;
+            }
+
+            const sizeSelect = document.getElementById('size-select');
+            const selectedSizeKey = sizeSelect.value;
+            const finalPrice = parseFloat(document.getElementById('panel-final-price').innerText);
+            
+            // Determine which size list to use for display name
+            const sizeList = item.isDrink ? DRINK_SIZES : FOOD_SIZES;
+            const selectedSizeName = sizeList[selectedSizeKey].displayName;
+
+            let tempKey = 'none';
+            let tempName = '';
+
+            if (item.needsTemp) {
+                const tempSelect = document.getElementById('temp-select');
+                tempKey = tempSelect.value;
+                tempName = tempKey.charAt(0).toUpperCase() + tempKey.slice(1);
+            }
+            
+            // Build the unique key and display name
+            const cartKey = `${item.id}-${selectedSizeKey}-${tempKey}`;
+            let displayName = `${item.name} (${selectedSizeName})`;
+            if (item.needsTemp) {
+                displayName += ` (${tempName})`;
+            }
+
+            // Add to cart and close panel
+            addToCart(cartKey, displayName, finalPrice);
+            hideOptionsPanel();
+        }
+
+        // --- CART LOGIC (Unchanged) ---
+        
+        function addToCart(cartKey, name, price) {
+            // Price is already calculated by the panel logic or for non-drink items
+            const finalPrice = parseFloat(price.toFixed(2));
+            
+            if (cart[cartKey]) {
+                cart[cartKey].quantity += 1;
+            } else {
+                cart[cartKey] = { id: cartKey, name: name, price: finalPrice, quantity: 1 };
+            }
+            updateUI();
+        }
+
+        function removeFromCart(cartKey) {
+            if (cart[cartKey] && cart[cartKey].quantity > 1) {
+                cart[cartKey].quantity -= 1;
+            } else {
+                delete cart[cartKey];
+            }
+            updateUI();
+        }
+
+        function updateUI() {
+            const list = document.getElementById('cart-list');
+            list.innerHTML = '';
+            let subtotal = 0;
+
+            if (Object.keys(cart).length === 0) {
+                 list.innerHTML = '<li class="list-group-item text-muted text-center py-4">Order is empty.</li>';
+            } else {
+                for (const cartKey in cart) {
+                    const item = cart[cartKey];
+                    const itemTotal = item.price * item.quantity;
+                    subtotal += itemTotal;
+                    
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item d-flex justify-content-between align-items-center p-2';
+                    li.innerHTML = `
+                        <div>${item.name} (${item.quantity}x)<small class="text-muted d-block">₱${item.price.toFixed(2)} ea</small></div>
+                        <div class="d-flex align-items-center">
+                            <strong>₱${itemTotal.toFixed(2)}</strong>
+                            <button class="btn btn-sm btn-danger ms-2 p-0 px-1" onclick="removeFromCart('${cartKey}')">-</button>
+                        </div>
+                    `;
+                    list.appendChild(li);
+                }
+            }
+            
+            const selectedDiscountRadio = document.querySelector('input[name="discountRadio"]:checked');
+            const discountRate = selectedDiscountRadio ? parseFloat(selectedDiscountRadio.value) : 0;
+            
+            const discount = subtotal * discountRate;
+            const finalTotal = subtotal - discount;
+            
+            document.getElementById('subtotal-price').innerText = subtotal.toFixed(2);
+            document.getElementById('discount-amount').innerText = discount.toFixed(2);
+            document.getElementById('total-price').innerText = finalTotal.toFixed(2);
+        }
+        
+        // --- AUTHENTICATION & NAVIGATION LOGIC (Modified to target new button location) ---
 
         function setDiscountControlsDisabled(isDisabled) {
             const radios = document.querySelectorAll('.discount-radio');
@@ -200,22 +482,19 @@
             const hasDiscountAccess = userRole === 'Admin' || tempAccess;
             setDiscountControlsDisabled(!hasDiscountAccess);
             
-            const overrideBtn = document.getElementById('adminOverrideBtn');
+            // Control Override Button visibility (NEW LOCATION TARGET)
+            const overrideContainer = document.getElementById('adminOverrideContainer');
             if (userRole === 'Cashier' && !tempAccess) {
-                overrideBtn.classList.remove('d-none');
+                overrideContainer.classList.remove('d-none');
             } else {
-                overrideBtn.classList.add('d-none');
+                overrideContainer.classList.add('d-none');
             }
 
             let links = '';
-
             if (userRole === 'Admin') { 
                 links += `<li class="nav-item"><a class="nav-link" href="dashboard.html">Dashboard</a></li>`;
             }
-
             links += '<li class="nav-item"><a class="nav-link active" href="orders.html">Orders</a></li>';
-
-            // 3. Products and Reports (Admin only)
             if (userRole === 'Admin') { 
                 links += `
                     <li class="nav-item"><a class="nav-link" href="product_management.html">Products</a></li>
@@ -237,61 +516,6 @@
             } else {
                 alert("Invalid Admin credentials. Access denied.");
             }
-        }
-
-
-        function updateUI() {
-            const list = document.getElementById('cart-list');
-            list.innerHTML = '';
-            let subtotal = 0;
-
-            if (Object.keys(cart).length === 0) {
-                 list.innerHTML = '<li class="list-group-item text-muted text-center py-4">Order is empty.</li>';
-            } else {
-                for (const id in cart) {
-                    const item = cart[id];
-                    const itemTotal = item.price * item.quantity;
-                    subtotal += itemTotal;
-                    
-                    const li = document.createElement('li');
-                    li.className = 'list-group-item d-flex justify-content-between align-items-center p-2';
-                    li.innerHTML = `
-                        <div>${item.name} (${item.quantity}x)<small class="text-muted d-block">₱${item.price.toFixed(2)} ea</small></div>
-                        <div class="d-flex align-items-center">
-                            <strong>₱${itemTotal.toFixed(2)}</strong>
-                            <button class="btn btn-sm btn-danger ms-2 p-0 px-1" onclick="removeFromCart(${id})">-</button>
-                        </div>
-                    `;
-                    list.appendChild(li);
-                }
-            }
-            
-            const selectedDiscountRadio = document.querySelector('input[name="discountRadio"]:checked');
-            const discountRate = selectedDiscountRadio ? parseFloat(selectedDiscountRadio.value) : 0;
-            
-            const discount = subtotal * discountRate;
-            const finalTotal = subtotal - discount;
-            
-            document.getElementById('subtotal-price').innerText = subtotal.toFixed(2);
-            document.getElementById('discount-amount').innerText = discount.toFixed(2);
-            document.getElementById('total-price').innerText = finalTotal.toFixed(2);
-        }
-        
-        function addToCart(id, name, price) {
-            if (cart[id]) {
-                cart[id].quantity += 1;
-            } else {
-                cart[id] = { id, name, price, quantity: 1 };
-            }
-            updateUI();
-        }
-        function removeFromCart(id) {
-            if (cart[id] && cart[id].quantity > 1) {
-                cart[id].quantity -= 1;
-            } else {
-                delete cart[id];
-            }
-            updateUI();
         }
 
         function clearOrder() {
