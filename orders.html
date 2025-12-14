@@ -8,6 +8,15 @@
     <style>
         body { background-color: #f8f9fa; } /* Lighter overall background */
         .bg-cafe { background-color: #5d4037 !important; } /* Darker, richer coffee color for the navbar */
+        
+        /* --- NEW LOGO CSS --- */
+        .navbar-logo {
+            height: 30px; /* Adjust height as needed */
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        /* --- END LOGO CSS --- */
+
         .menu-item { 
             cursor: pointer; 
             transition: transform 0.2s, box-shadow 0.2s; 
@@ -58,7 +67,10 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-cafe shadow-sm">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="#">☕ Kapihan ni Boss G POS (<span id="userRoleDisplay">Guest</span>)</a>
+            <a class="navbar-brand fw-bold" href="#">
+                <img src="logo_bossg.png" alt="Kapihan ni Boss G Logo" class="navbar-logo">
+                Kapihan ni Boss G POS (<span id="userRoleDisplay">Guest</span>)
+            </a>
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="navLinks">
                     </ul>
@@ -499,6 +511,7 @@
                 links += `
                     <li class="nav-item"><a class="nav-link" href="product_management.html">Products</a></li>
                     <li class="nav-item"><a class="nav-link" href="reports.html">Reports</a></li>
+                    <li class="nav-item"><a class="nav-link" href="user_settings.html">Users & Settings</a></li>
                 `;
             }
 
@@ -509,12 +522,15 @@
             const adminUsername = prompt("Enter Admin Username for Override:");
             const adminPassword = prompt("Enter Admin Password for Override:");
             
-            if (adminUsername === 'admin' && adminPassword === 'adminpass') {
+            const users = JSON.parse(localStorage.getItem('posUsers')) || {};
+            const adminUser = users[adminUsername];
+
+            if (adminUser && adminUser.role === 'Admin' && adminUser.password === adminPassword) {
                 localStorage.setItem('tempAdminAccess', 'true');
                 alert("Admin override granted for this transaction. Discounts are now enabled. Admin links are restricted to permanent Admin role only.");
                 checkAccessAndRenderNav();
             } else {
-                alert("Invalid Admin credentials. Access denied.");
+                alert("Invalid Admin credentials. Access denied or user is not an Admin.");
             }
         }
 

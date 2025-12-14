@@ -8,14 +8,28 @@
     <style>
         body { background-color: #f8f9fa; }
         .bg-cafe { background-color: #5d4037 !important; }
-        .product-img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; }
-        .table thead th { background-color: #e9ecef; }
+        /* --- NEW LOGO CSS --- */
+        .navbar-logo {
+            height: 30px; /* Adjust height as needed */
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        /* --- END LOGO CSS --- */
+        .product-image-thumbnail {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-cafe shadow-sm">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="#">☕ Kapihan ni Boss G POS (Admin)</a>
+            <a class="navbar-brand fw-bold" href="#">
+                <img src="logo_bossg.png" alt="Kapihan ni Boss G Logo" class="navbar-logo">
+                Kapihan ni Boss G POS (Admin)
+            </a>
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="navLinks">
                     </ul>
@@ -25,52 +39,58 @@
     </nav>
 
     <div class="container mt-4">
-        <h3 class="mb-4 text-secondary">Product Management</h3>
-        
-        <div class="d-flex justify-content-end mb-3">
-            <button class="btn btn-success" onclick="openEditModal('new')">Add New Product</button>
-        </div>
+        <h3 class="mb-4 text-secondary">Product Inventory Management</h3>
+
+        <div class="card shadow mb-4">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                Add New Product
+                <button class="btn btn-sm btn-light" onclick="openProductModal('new')">Open Form</button>
+            </div>
+            </div>
 
         <div class="card shadow">
+            <div class="card-header bg-primary text-white">Current Products</div>
             <div class="card-body">
-                <table class="table table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Image</th>
-                            <th>Name</th>
-                            <th>Category</th>
-                            <th>Base Price (₱)</th>
-                            <th>Options</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="product-list">
-                        </tbody>
-                </table>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Image</th>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Category</th>
+                                <th>Base Price (₱)</th>
+                                <th>Options</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="product-list-body">
+                            </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
-    
+
     <div class="modal fade" id="productModal" tabindex="-1" aria-labelledby="productModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title" id="productModalLabel">Edit Product</h5>
+                    <h5 class="modal-title" id="productModalLabel">Add New Product</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <form id="productForm">
-                        <input type="hidden" id="product-id">
-                        
+                        <input type="hidden" id="original-id">
+
                         <div class="mb-3">
-                            <label for="product-name" class="form-label">Product Name</label>
-                            <input type="text" class="form-control" id="product-name" required>
+                            <label for="productName" class="form-label">Name</label>
+                            <input type="text" class="form-control" id="productName" required>
                         </div>
-                        
+
                         <div class="mb-3">
-                            <label for="product-category" class="form-label">Category</label>
-                            <select class="form-select" id="product-category" required>
+                            <label for="productCategory" class="form-label">Category</label>
+                            <select class="form-select" id="productCategory" required>
                                 <option value="Coffee">Coffee</option>
                                 <option value="Tea">Tea</option>
                                 <option value="Juice">Juice</option>
@@ -80,85 +100,62 @@
                         </div>
                         
                         <div class="mb-3">
-                            <label for="product-price" class="form-label">Base Price (₱)</label>
-                            <input type="number" class="form-control" id="product-price" step="0.01" min="0" required>
+                            <label for="productPrice" class="form-label">Base Price (₱)</label>
+                            <input type="number" step="0.01" min="0.01" class="form-control" id="productPrice" required>
                         </div>
                         
                         <div class="mb-3">
-                            <label for="product-image" class="form-label">Image URL</label>
-                            <input type="url" class="form-control" id="product-image" required>
+                            <label for="productImage" class="form-label">Image URL (Optional)</label>
+                            <input type="url" class="form-control" id="productImage" placeholder="https://example.com/image.jpg">
                         </div>
                         
-                        <h6 class="mt-4 border-bottom pb-2">Product Options</h6>
-                        
-                        <div class="form-check form-switch mb-2">
-                            <input class="form-check-input" type="checkbox" id="isDrink">
-                            <label class="form-check-label" for="isDrink">Is a Drink (Enables Volume Sizes)</label>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="isDrink">
+                            <label class="form-check-label" for="isDrink">Is a Drink (Requires Size Option)</label>
                         </div>
-                        
-                        <div class="form-check form-switch mb-2">
-                            <input class="form-check-input" type="checkbox" id="needsTemp">
-                            <label class="form-check-label" for="needsTemp">Needs Temp (Hot/Iced)</label>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="needsTemp">
+                            <label class="form-check-label" for="needsTemp">Requires Temperature Option (Hot/Iced)</label>
                         </div>
-                        
-                        <div class="form-check form-switch mb-2">
-                            <input class="form-check-input" type="checkbox" id="needsFoodSize">
-                            <label class="form-check-label" for="needsFoodSize">Needs Food Portion (Single/To Share)</label>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="needsFoodSize">
+                            <label class="form-check-label" for="needsFoodSize">Requires Meal Portion Size Option (Single/Share)</label>
                         </div>
+
                     </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary" onclick="saveProduct()">Save Changes</button>
+                    <button type="button" class="btn btn-primary" onclick="saveProduct()">Save Product</button>
                 </div>
             </div>
         </div>
     </div>
 
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Initial synchronized data with new names, images, and properties
-        const initialMenuItems = [
-            // Coffee Category 
-            { id: 1, name: 'Latte', category: 'Coffee', price: 150.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://images.immediate.co.uk/production/volatile/sites/30/2020/08/iced-latte-30188f7.jpg?quality=90&webp=true&resize=440,400' },
-            { id: 3, name: 'Espresso', category: 'Coffee', price: 120.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://www.wyseguide.com/wp-content/uploads/2025/07/Shaken-Espresso-011-600x600.jpg' },
-            { id: 5, name: 'Americano', category: 'Coffee', price: 130.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://assets.beanbox.com/blog_images/AB7ud4YSE6nmOX0iGlgA.jpeg' },
-            { id: 7, name: 'Hot Chocolate', category: 'Coffee', price: 140.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://assets.epicurious.com/photos/61eb09dfb37c8d2963dd7bde/1:1/w_1280,c_limit/HotCocoaForOne_RECIPE_012022_086_VOG_final.jpg' },
-            
-            // Pastry Category - Name changed to Muffin
-            { id: 2, name: 'Croissant', category: 'Pastry', price: 95.00, isDrink: false, needsTemp: false, needsFoodSize: false, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Croissant-Petr_Kratochvil.jpg/960px-Croissant-Petr_Kratochvil.jpg' },
-            { id: 6, name: 'Muffin', category: 'Pastry', price: 110.00, isDrink: false, needsTemp: false, needsFoodSize: false, image: 'https://hostessatheart.com/wp-content/uploads/2018/02/Basic-Homemade-Muffin-Recipe-2-682x1024.jpg' },
-            
-            // Tea Category 
-            { id: 4, name: 'Regular Tea', category: 'Tea', price: 80.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://sudachirecipes.com/wp-content/uploads/2025/03/royal-milk-tea-thumb-550x550.png' },
-            
-            // Juice Category 
-            { id: 9, name: 'Fresh Orange Juice', category: 'Juice', price: 110.00, isDrink: true, needsTemp: false, needsFoodSize: false, image: 'https://cdn2.foodviva.com/static-content/food-images/juice-recipes/orange-pineapple-juice-recipe/orange-pineapple-juice-recipe.jpg' },
-            
-            // Meal Category - Name changed to Spaghetti. needsFoodSize: true
-            { id: 8, name: 'Club Sandwich', category: 'Meal', price: 220.00, isDrink: false, needsTemp: false, needsFoodSize: true, image: 'https://ichef.bbci.co.uk/food/ic/food_16x9_1600/recipes/club_sandwich_16496_16x9.jpg' },
-            { id: 10, name: 'Spaghetti', category: 'Meal', price: 280.00, isDrink: false, needsTemp: false, needsFoodSize: true, image: 'https://img.taste.com.au/WiSuiqrj/w643-h428-cfill-q90/taste/2024/03/5-ingredient-turbo-charged-spaghetti-recipe-196959-1-jpg-218232-1.jpg' }
-        ];
-
-        let products = [];
+        let currentProducts = []; 
         const productModal = new bootstrap.Modal(document.getElementById('productModal'));
+
+        // --- AUTHENTICATION & NAVIGATION ---
 
         document.addEventListener('DOMContentLoaded', () => {
             checkAdminAccess();
             loadProducts();
-            renderProducts();
+            renderNav();
+            renderProductList();
         });
-
-        // --- AUTHENTICATION & NAVIGATION ---
 
         function checkAdminAccess() {
             const userRole = localStorage.getItem('userRole');
             if (userRole !== 'Admin') {
-                alert("Access Denied. You must be logged in as an Admin to manage products.");
+                alert("Access Denied. You must be logged in as an Admin to manage Products.");
                 window.location.href = 'login.html';
                 return;
             }
-            renderNav();
         }
 
         function renderNav() {
@@ -168,96 +165,103 @@
                 <li class="nav-item"><a class="nav-link" href="orders.html">Orders</a></li>
                 <li class="nav-item"><a class="nav-link active" href="product_management.html">Products</a></li>
                 <li class="nav-item"><a class="nav-link" href="reports.html">Reports</a></li>
+                <li class="nav-item"><a class="nav-link" href="user_settings.html">Users & Settings</a></li>
             `;
         }
 
-        // --- PRODUCT DATA HANDLING ---
+        // --- DATA MANAGEMENT ---
+        
+        // Initial / Default Product List
+        const defaultProducts = [
+            { id: 1, name: 'Latte', category: 'Coffee', price: 150.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://images.immediate.co.uk/production/volatile/sites/30/2020/08/iced-latte-30188f7.jpg?quality=90&webp=true&resize=440,400' },
+            { id: 2, name: 'Croissant', category: 'Pastry', price: 95.00, isDrink: false, needsTemp: false, needsFoodSize: false, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Croissant-Petr_Kratochvil.jpg/960px-Croissant-Petr_Kratochvil.jpg' },
+            { id: 3, name: 'Espresso', category: 'Coffee', price: 120.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://www.wyseguide.com/wp-content/uploads/2025/07/Shaken-Espresso-011-600x600.jpg' },
+            { id: 4, name: 'Regular Tea', category: 'Tea', price: 80.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://sudachirecipes.com/wp-content/uploads/2025/03/royal-milk-tea-thumb-550x550.png' },
+            { id: 5, name: 'Americano', category: 'Coffee', price: 130.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://assets.beanbox.com/blog_images/AB7ud4YSE6nmOX0iGlgA.jpeg' },
+            { id: 6, name: 'Muffin', category: 'Pastry', price: 110.00, isDrink: false, needsTemp: false, needsFoodSize: false, image: 'https://hostessatheart.com/wp-content/uploads/2018/02/Basic-Homemade-Muffin-Recipe-2-682x1024.jpg' },
+            { id: 7, name: 'Hot Chocolate', category: 'Coffee', price: 140.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://assets.epicurious.com/photos/61eb09dfb37c8d2963dd7bde/1:1/w_1280,c_limit/HotCocoaForOne_RECIPE_012022_086_VOG_final.jpg' },
+            { id: 8, name: 'Club Sandwich', category: 'Meal', price: 220.00, isDrink: false, needsTemp: false, needsFoodSize: true, image: 'https://ichef.bbci.co.uk/food/ic/food_16x9_1600/recipes/club_sandwich_16496_16x9.jpg' },
+            { id: 9, name: 'Fresh Orange Juice', category: 'Juice', price: 110.00, isDrink: true, needsTemp: false, needsFoodSize: false, image: 'https://cdn2.foodviva.com/static-content/food-images/juice-recipes/orange-pineapple-juice-recipe/orange-pineapple-juice-recipe.jpg' },
+            { id: 10, name: 'Spaghetti', category: 'Meal', price: 280.00, isDrink: false, needsTemp: false, needsFoodSize: true, image: 'https://img.taste.com.au/WiSuiqrj/w643-h428-cfill-q90/taste/2024/03/5-ingredient-turbo-charged-spaghetti-recipe-196959-1-jpg-218232-1.jpg' }
+        ];
 
         function loadProducts() {
-            const storedProducts = localStorage.getItem('menuProducts');
+            const storedProducts = localStorage.getItem('products');
             if (storedProducts) {
-                products = JSON.parse(storedProducts);
+                currentProducts = JSON.parse(storedProducts);
             } else {
-                // Initialize with the synchronized data if no products are stored
-                products = initialMenuItems;
+                currentProducts = defaultProducts;
                 saveProducts();
             }
         }
 
         function saveProducts() {
-            localStorage.setItem('menuProducts', JSON.stringify(products));
-            // Optional: Alert the user or provide a visual cue that data is saved.
+            localStorage.setItem('products', JSON.stringify(currentProducts));
         }
 
-        function getNextProductId() {
-            if (products.length === 0) return 1;
-            const maxId = Math.max(...products.map(p => p.id));
+        function getNextId() {
+            if (currentProducts.length === 0) return 1;
+            const maxId = currentProducts.reduce((max, p) => p.id > max ? p.id : max, 0);
             return maxId + 1;
         }
 
-        // --- UI RENDERING ---
+        function renderProductList() {
+            const tbody = document.getElementById('product-list-body');
+            tbody.innerHTML = '';
 
-        function renderProducts() {
-            const tableBody = document.getElementById('product-list');
-            tableBody.innerHTML = '';
-            
-            // Sort products by ID
-            products.sort((a, b) => a.id - b.id);
-
-            if (products.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No products found.</td></tr>';
+            if (currentProducts.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No products in inventory.</td></tr>';
                 return;
             }
 
-            products.forEach(product => {
-                // Determine the options display string
-                let options = [];
-                if (product.isDrink) options.push("Sizes");
-                if (product.needsTemp) options.push("Temp");
-                if (product.needsFoodSize) options.push("Portions");
-                
-                const optionsStr = options.length > 0 ? options.join(', ') : 'None';
+            currentProducts.sort((a, b) => a.id - b.id); 
 
+            currentProducts.forEach(product => {
+                const options = [];
+                if (product.isDrink) options.push('Size');
+                if (product.needsTemp) options.push('Temp');
+                if (product.needsFoodSize) options.push('Portion');
+                
+                const optionDisplay = options.length > 0 ? options.join(', ') : 'None';
+                
                 const row = `
                     <tr>
+                        <td><img src="${product.image || 'https://via.placeholder.com/50x50?text=No+Img'}" class="product-image-thumbnail" onerror="this.src='https://via.placeholder.com/50x50?text=No+Img'"></td>
                         <td>${product.id}</td>
-                        <td><img src="${product.image}" class="product-img" alt="${product.name}"></td>
-                        <td>${product.name}</td>
+                        <td class="fw-bold">${product.name}</td>
                         <td>${product.category}</td>
                         <td>₱${product.price.toFixed(2)}</td>
-                        <td>${optionsStr}</td>
+                        <td>${optionDisplay}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary me-2" onclick="openEditModal(${product.id})">Edit</button>
+                            <button class="btn btn-sm btn-primary me-2" onclick="openProductModal(${product.id})">Edit</button>
                             <button class="btn btn-sm btn-danger" onclick="deleteProduct(${product.id})">Delete</button>
                         </td>
                     </tr>
                 `;
-                tableBody.innerHTML += row;
+                tbody.innerHTML += row;
             });
         }
-
+        
         // --- CRUD ACTIONS ---
 
-        function openEditModal(productId) {
-            const isNew = productId === 'new';
+        function openProductModal(id) {
+            const isNew = id === 'new';
             const modalTitle = document.getElementById('productModalLabel');
             const form = document.getElementById('productForm');
             form.reset(); 
-
-            document.getElementById('product-id').value = isNew ? '' : productId;
+            
+            document.getElementById('original-id').value = isNew ? '' : id;
 
             if (isNew) {
                 modalTitle.textContent = 'Add New Product';
             } else {
                 modalTitle.textContent = 'Edit Product';
-                const product = products.find(p => p.id === productId);
+                const product = currentProducts.find(p => p.id === id);
                 if (product) {
-                    document.getElementById('product-name').value = product.name;
-                    document.getElementById('product-category').value = product.category;
-                    document.getElementById('product-price').value = product.price.toFixed(2);
-                    document.getElementById('product-image').value = product.image;
-                    
-                    // Set checkbox values for options
+                    document.getElementById('productName').value = product.name;
+                    document.getElementById('productCategory').value = product.category;
+                    document.getElementById('productPrice').value = product.price;
+                    document.getElementById('productImage').value = product.image || '';
                     document.getElementById('isDrink').checked = product.isDrink;
                     document.getElementById('needsTemp').checked = product.needsTemp;
                     document.getElementById('needsFoodSize').checked = product.needsFoodSize;
@@ -267,57 +271,50 @@
         }
 
         function saveProduct() {
-            const idValue = document.getElementById('product-id').value;
-            const isNew = idValue === '';
+            const originalId = document.getElementById('original-id').value;
+            const isNew = originalId === '';
             
             if (!document.getElementById('productForm').checkValidity()) {
-                alert('Please fill out all required fields.');
+                alert('Please fill out all required fields (Name, Category, Base Price).');
                 return;
             }
 
-            const name = document.getElementById('product-name').value;
-            const category = document.getElementById('product-category').value;
-            const price = parseFloat(document.getElementById('product-price').value);
-            const image = document.getElementById('product-image').value;
-            const isDrink = document.getElementById('isDrink').checked;
-            const needsTemp = document.getElementById('needsTemp').checked;
-            const needsFoodSize = document.getElementById('needsFoodSize').checked;
-
-            const newProduct = {
-                name,
-                category,
-                price,
-                isDrink,
-                needsTemp,
-                needsFoodSize,
-                image
+            const newProductData = {
+                name: document.getElementById('productName').value,
+                category: document.getElementById('productCategory').value,
+                price: parseFloat(document.getElementById('productPrice').value),
+                image: document.getElementById('productImage').value,
+                isDrink: document.getElementById('isDrink').checked,
+                needsTemp: document.getElementById('needsTemp').checked,
+                needsFoodSize: document.getElementById('needsFoodSize').checked,
             };
 
             if (isNew) {
-                newProduct.id = getNextProductId();
-                products.push(newProduct);
-                alert(`Product '${name}' added successfully!`);
-            } else {
-                const productId = parseInt(idValue);
-                const index = products.findIndex(p => p.id === productId);
+                // ADD new product
+                newProductData.id = getNextId();
+                currentProducts.push(newProductData);
+                alert(`Product '${newProductData.name}' added successfully! ID: ${newProductData.id}`);
                 
+            } else {
+                // EDIT existing product
+                const index = currentProducts.findIndex(p => p.id === parseInt(originalId));
                 if (index !== -1) {
-                    products[index] = { ...products[index], ...newProduct };
-                    alert(`Product '${name}' updated successfully!`);
+                    currentProducts[index] = { ...currentProducts[index], ...newProductData };
+                    alert(`Product '${newProductData.name}' updated successfully!`);
                 }
             }
 
             saveProducts();
-            renderProducts();
+            renderProductList();
             productModal.hide();
         }
 
-        function deleteProduct(productId) {
-            if (confirm(`Are you sure you want to delete Product ID ${productId}? This action cannot be undone.`)) {
-                products = products.filter(p => p.id !== productId);
+        function deleteProduct(id) {
+            if (confirm(`Are you sure you want to delete product ID ${id}? This action is permanent and cannot be undone.`)) {
+                currentProducts = currentProducts.filter(p => p.id !== id);
                 saveProducts();
-                renderProducts();
-                alert(`Product ID ${productId} deleted.`);
+                renderProductList();
+                alert(`Product ID ${id} deleted.`);
             }
         }
     </script>

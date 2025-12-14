@@ -8,12 +8,22 @@
     <style>
         body { background-color: #f8f9fa; }
         .bg-cafe { background-color: #5d4037 !important; }
+        /* --- NEW LOGO CSS --- */
+        .navbar-logo {
+            height: 30px; /* Adjust height as needed */
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        /* --- END LOGO CSS --- */
     </style>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-cafe shadow-sm">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="#">☕ Kapihan ni Boss G POS (Admin)</a>
+            <a class="navbar-brand fw-bold" href="#">
+                <img src="logo_bossg.png" alt="Kapihan ni Boss G Logo" class="navbar-logo">
+                Kapihan ni Boss G POS (Admin)
+            </a>
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="navLinks">
                     </ul>
@@ -106,6 +116,7 @@
                 <li class="nav-item"><a class="nav-link" href="orders.html">Orders</a></li>
                 <li class="nav-item"><a class="nav-link" href="product_management.html">Products</a></li>
                 <li class="nav-item"><a class="nav-link active" href="reports.html">Reports</a></li>
+                <li class="nav-item"><a class="nav-link" href="user_settings.html">Users & Settings</a></li>
             `;
         }
 
@@ -116,8 +127,6 @@
             const endDate = document.getElementById('endDate').value;
 
             // In a real system, these dates would filter server data. 
-            // Here, we just simulate data generation.
-            
             alert(`Generating simulated report for period: ${startDate} to ${endDate}`);
             
             renderSalesSummary();

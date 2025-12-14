@@ -11,12 +11,22 @@
         .card-icon { font-size: 3rem; color: #5d4037; }
         .info-card { transition: transform 0.2s; }
         .info-card:hover { transform: translateY(-5px); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important; }
+        /* --- NEW LOGO CSS --- */
+        .navbar-logo {
+            height: 30px; /* Adjust height as needed */
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        /* --- END LOGO CSS --- */
     </style>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-cafe shadow-sm">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="#">☕ Kapihan ni Boss G POS (Admin)</a>
+            <a class="navbar-brand fw-bold" href="#">
+                <img src="logo_bossg.png" alt="Kapihan ni Boss G Logo" class="navbar-logo">
+                Kapihan ni Boss G POS (Admin)
+            </a>
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="navLinks">
                     </ul>
@@ -66,7 +76,7 @@
                         <a href="orders.html" class="list-group-item list-group-item-action">Manage Orders</a>
                         <a href="product_management.html" class="list-group-item list-group-item-action">Product Inventory</a>
                         <a href="reports.html" class="list-group-item list-group-item-action">Detailed Reports</a>
-                        <a href="user_settings.html" class="list-group-item list-group-item-action text-danger" onclick="alert('User/Settings Management requires a secure database and backend. This feature is a placeholder for the demo.')">Settings & Users</a>
+                        <a href="user_settings.html" class="list-group-item list-group-item-action text-danger">Settings & Users</a>
                     </div>
                 </div>
             </div>
@@ -121,6 +131,7 @@
                 <li class="nav-item"><a class="nav-link" href="orders.html">Orders</a></li>
                 <li class="nav-item"><a class="nav-link" href="product_management.html">Products</a></li>
                 <li class="nav-item"><a class="nav-link" href="reports.html">Reports</a></li>
+                <li class="nav-item"><a class="nav-link" href="user_settings.html">Users & Settings</a></li>
             `;
         }
         
