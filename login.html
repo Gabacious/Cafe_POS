@@ -3,66 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Café POS Login</title>
+    <title>Kapihan ni Boss G - Login</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f8f7f5; }
-        .login-container { max-width: 400px; margin-top: 100px; padding: 25px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); background-color: white; }
-        .btn-cafe { background-color: #6F4E37; color: white; border: none; }
-        .btn-cafe:hover { background-color: #5a3c26; color: white; }
+        body {
+            background-color: #f8f9fa;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .login-container {
+            max-width: 400px;
+            width: 100%;
+            padding: 20px;
+        }
+        .bg-cafe { background-color: #5d4037 !important; }
+        .text-cafe { color: #5d4037 !important; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="login-container mx-auto">
-            <h2 class="text-center mb-4 text-secondary">Café POS Staff Login</h2>
-            
-            <form id="loginForm"> 
-                <div class="mb-3">
-                    <label for="username" class="form-label">Username</label>
-                    <input type="text" class="form-control" id="username" name="username" required>
-                </div>
-                <div class="mb-3">
-                    <label for="password" class="form-label">Password</label>
-                    <input type="password" class="form-control" id="password" name="password" required>
-                </div>
-                <button type="submit" class="btn btn-cafe w-100">Log In</button>
-            </form>
-            
-            <p id="error-message" class="text-center text-danger mt-3 d-none">Invalid credentials.</p>
-            
-            <p class="text-center text-muted mt-3">
-                <small>
-                    Simulated Login: 
-                    <br>Admin: `admin` / `adminpass`
-                    <br>Cashier: `cashier` / `cashierpass`
-                </small>
-            </p>
+    <div class="login-container">
+        <div class="card shadow-lg border-0">
+            <div class="card-header bg-cafe text-white text-center py-3">
+                <h4 class="mb-0 fw-bold">☕ Kapihan ni Boss G POS</h4>
+                <small>Staff Login</small>
+            </div>
+            <div class="card-body p-4">
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <label for="username" class="form-label text-cafe fw-bold">Username</label>
+                        <input type="text" class="form-control" id="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label text-cafe fw-bold">Password</label>
+                        <input type="password" class="form-control" id="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="role" class="form-label text-cafe fw-bold">Login As</label>
+                        <select class="form-select" id="role" required>
+                            <option value="Cashier">Cashier</option>
+                            <option value="Admin">Admin</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary bg-cafe border-0 w-100 mt-2">LOGIN</button>
+                    
+                    <div class="mt-4 p-2 border rounded bg-light">
+                        <small class="d-block">**Demo Credentials**</small>
+                        <small>Admin: u: `admin` | p: `adminpass`</small><br>
+                        <small>Cashier: u: `cashier` | p: `cashierpass`</small>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+        document.getElementById('loginForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
-            const errorMessage = document.getElementById('error-message');
+            const role = document.getElementById('role').value;
             
-            let role = null;
+            // Hardcoded Demo Credentials
+            const credentials = {
+                'admin': 'adminpass',
+                'cashier': 'cashierpass'
+            };
 
-            if (username === 'admin' && password === 'adminpass') {
-                role = 'Admin';
-            } else if (username === 'cashier' && password === 'cashierpass') {
-                role = 'Cashier';
-            }
-
-            if (role) {
+            if (credentials[username] === password) {
+                // Successful login
                 localStorage.setItem('userRole', role);
-                window.location.href = 'orders.html'; 
+                localStorage.setItem('currentUser', username);
+                
+                if (role === 'Admin') {
+                    window.location.href = 'dashboard.html';
+                } else {
+                    window.location.href = 'orders.html';
+                }
             } else {
-                errorMessage.classList.remove('d-none');
+                alert('Invalid credentials or role combination.');
             }
         });
+        
+        // Clear local storage on load to ensure a fresh login
+        localStorage.clear();
     </script>
 </body>
 </html>

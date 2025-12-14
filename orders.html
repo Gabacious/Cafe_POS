@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Café POS - Order System (Pesos)</title>
+    <title>Kapihan ni Boss G POS - Order System (Pesos)</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background-color: #f8f9fa; } /* Lighter overall background */
@@ -58,7 +58,7 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-cafe shadow-sm">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="#">☕ Café POS (<span id="userRoleDisplay">Guest</span>)</a>
+            <a class="navbar-brand fw-bold" href="#">☕ Kapihan ni Boss G POS (<span id="userRoleDisplay">Guest</span>)</a>
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="navLinks">
                     </ul>
@@ -164,17 +164,17 @@
             { id: 5, name: 'Americano', category: 'Coffee', price: 130.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://assets.beanbox.com/blog_images/AB7ud4YSE6nmOX0iGlgA.jpeg' },
             { id: 7, name: 'Hot Chocolate', category: 'Coffee', price: 140.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://assets.epicurious.com/photos/61eb09dfb37c8d2963dd7bde/1:1/w_1280,c_limit/HotCocoaForOne_RECIPE_012022_086_VOG_final.jpg' },
             
-            // Pastry Category - No size/temp needed
+            // Pastry Category - Name changed to Muffin
             { id: 2, name: 'Croissant', category: 'Pastry', price: 95.00, isDrink: false, needsTemp: false, needsFoodSize: false, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Croissant-Petr_Kratochvil.jpg/960px-Croissant-Petr_Kratochvil.jpg' },
             { id: 6, name: 'Muffin', category: 'Pastry', price: 110.00, isDrink: false, needsTemp: false, needsFoodSize: false, image: 'https://hostessatheart.com/wp-content/uploads/2018/02/Basic-Homemade-Muffin-Recipe-2-682x1024.jpg' },
             
             // Tea Category 
             { id: 4, name: 'Regular Tea', category: 'Tea', price: 80.00, isDrink: true, needsTemp: true, needsFoodSize: false, image: 'https://sudachirecipes.com/wp-content/uploads/2025/03/royal-milk-tea-thumb-550x550.png' },
             
-            // Juice Category - Only needs size
+            // Juice Category 
             { id: 9, name: 'Fresh Orange Juice', category: 'Juice', price: 110.00, isDrink: true, needsTemp: false, needsFoodSize: false, image: 'https://cdn2.foodviva.com/static-content/food-images/juice-recipes/orange-pineapple-juice-recipe/orange-pineapple-juice-recipe.jpg' },
             
-            // Meal Category - Needs food size (portion)
+            // Meal Category - Name changed to Spaghetti. needsFoodSize: true
             { id: 8, name: 'Club Sandwich', category: 'Meal', price: 220.00, isDrink: false, needsTemp: false, needsFoodSize: true, image: 'https://ichef.bbci.co.uk/food/ic/food_16x9_1600/recipes/club_sandwich_16496_16x9.jpg' },
             { id: 10, name: 'Spaghetti', category: 'Meal', price: 280.00, isDrink: false, needsTemp: false, needsFoodSize: true, image: 'https://img.taste.com.au/WiSuiqrj/w643-h428-cfill-q90/taste/2024/03/5-ingredient-turbo-charged-spaghetti-recipe-196959-1-jpg-218232-1.jpg' }
         ];
@@ -577,7 +577,7 @@
 
             let receiptContent = `
                 <div style="width: 300px; padding: 10px; font-family: monospace; font-size: 12px; margin: 0 auto;">
-                    <h4 style="text-align: center; margin-bottom: 5px;">CAFÉ POS RECEIPT</h4>
+                    <h4 style="text-align: center; margin-bottom: 5px;">KAPIHAN NI BOSS G RECEIPT</h4>
                     <div style="text-align: center; border-bottom: 1px dashed black; padding-bottom: 5px; margin-bottom: 10px;">
                         <p style="margin: 0;">Transaction Date: ${date}</p>
                         <p style="margin: 0;">Cashier: ${userRole}</p>
