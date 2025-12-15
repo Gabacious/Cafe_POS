@@ -1,5 +1,5 @@
 <?php
-// orders.php (Consolidated: Handles UI rendering, Admin Override, Clear Override, and Order Processing)
+// orders.php (Updated with Full Role Control)
 session_start();
 
 // --- DATABASE CONNECTION BLOCK ---
@@ -9,11 +9,9 @@ $connectionOptions = [
     "Uid" => "",
     "PWD" => ""
 ];
-// Suppress the default error messages with @ to handle connection failure gracefully below
 $conn = @sqlsrv_connect($serverName, $connectionOptions);
 
 if ($conn === false) {
-    // Critical connection error handling
     die("
         <!DOCTYPE html>
         <html lang='en'><head><title>DB Error</title></head><body>
@@ -29,7 +27,7 @@ if ($conn === false) {
 }
 // --- END CONNECTION BLOCK ---
 
-// Check if logged in
+// Check if logged in (any role)
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     sqlsrv_close($conn);
@@ -41,24 +39,38 @@ $cashier_name = $_SESSION['username'];
 $is_admin = $_SESSION['user_role'] === 'Admin';
 
 
+// --- CUSTOM STRING ESCAPE FUNCTION (REQUIRED FIX) ---
+if (!function_exists('sqlsrv_escape_string')) {
+    function sqlsrv_escape_string($string) {
+        if (is_null($string)) return ''; 
+        return str_replace("'", "''", strval($string));
+    }
+}
+// ------------------------------------
+
+
 // --- 1. HANDLE ORDER PROCESSING AJAX REQUEST (POST) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['action'] === 'process_order') {
     
     header('Content-Type: application/json');
     $data = json_decode(file_get_contents('php://input'), true);
 
-    if (empty($data['items']) || !isset($data['totalAmount']) || !isset($data['discountRate'])) {
+    if (empty($data['items']) || !isset($data['totalAmount'])) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid order data received.']);
         sqlsrv_close($conn);
         exit();
     }
 
+    // Sanitize and prepare data 
     $subtotal = round(floatval($data['subtotal']), 2);
     $discountRate = round(floatval($data['discountRate']), 2);
     $discountAmount = round(floatval($data['discountAmount']), 2);
     $totalAmount = round(floatval($data['totalAmount']), 2);
-    $payment_method = 'Cash'; 
+    
+    // String values must be escaped
+    $safe_cashier_id = sqlsrv_escape_string($cashier_id);
+    $safe_payment_method = sqlsrv_escape_string('Cash'); 
     $orderId = null;
 
     if (sqlsrv_begin_transaction($conn) === false) {
@@ -69,15 +81,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
     }
 
     try {
-        // A. INSERT into Orders table
+        // A. INSERT into Orders table - Using String Interpolation
         $sql_order = "INSERT INTO Orders 
             (cashier_id, subtotal, discount_rate, discount_amount, total_amount, payment_method)
             OUTPUT INSERTED.order_id
-            VALUES (?, ?, ?, ?, ?, ?)";
+            VALUES ('$safe_cashier_id', $subtotal, $discountRate, $discountAmount, $totalAmount, '$safe_payment_method')";
         
-        $params_order = [ $cashier_id, $subtotal, $discountRate, $discountAmount, $totalAmount, $payment_method ];
-
-        $stmt_order = sqlsrv_query($conn, $sql_order, $params_order);
+        $stmt_order = sqlsrv_query($conn, $sql_order); 
 
         if ($stmt_order === false) {
             throw new Exception("Order header insertion failed: " . print_r(sqlsrv_errors(), true));
@@ -91,26 +101,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
         }
         sqlsrv_free_stmt($stmt_order);
 
-        // B. INSERT into Order_Items table for each item
-        $sql_item = "INSERT INTO Order_Items 
-            (order_id, product_id, quantity, unit_price, item_name_at_sale, selected_size, selected_temp) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)";
-
+        // B. INSERT into Order_Items table for each item - Using String Interpolation
         foreach ($data['items'] as $item) {
-            $params_item = [
-                $orderId,
-                $item['productId'],
-                $item['quantity'],
-                $item['unitPrice'],
-                $item['itemNameAtSale'],
-                $item['selectedSize'],
-                $item['selectedTemp']
-            ];
+            // Sanitize item-specific string data before interpolation
+            $productId = intval($item['productId']);
+            $quantity = intval($item['quantity']);
+            $unitPrice = round(floatval($item['unitPrice']), 2);
             
-            $stmt_item = sqlsrv_query($conn, $sql_item, $params_item);
+            // Escape and quote string fields
+            $safe_itemName = sqlsrv_escape_string($item['itemNameAtSale']);
+            $safe_selectedSize = sqlsrv_escape_string($item['selectedSize']);
+            $safe_selectedTemp = sqlsrv_escape_string($item['selectedTemp']);
+
+
+            $sql_item = "INSERT INTO Order_Items 
+                (order_id, product_id, quantity, unit_price, item_name_at_sale, selected_size, selected_temp) 
+                VALUES ($orderId, $productId, $quantity, $unitPrice, '$safe_itemName', '$safe_selectedSize', '$safe_selectedTemp')";
+            
+            $stmt_item = sqlsrv_query($conn, $sql_item);
             
             if ($stmt_item === false) {
-                throw new Exception("Order item insertion failed for product " . $item['productId'] . ": " . print_r(sqlsrv_errors(), true));
+                throw new Exception("Order item insertion failed for product " . $productId . ": " . print_r(sqlsrv_errors(), true));
             }
             sqlsrv_free_stmt($stmt_item);
         }
@@ -120,7 +131,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
         
         // D. Clear the Admin Override flag if it was used
         if (isset($_SESSION['admin_override_authorized'])) {
-            // Only unset the override *after* a successful transaction to allow subsequent calls to read the flag
             unset($_SESSION['admin_override_authorized']);
         }
 
@@ -157,26 +167,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
     $password = $data['password'];
     $output = ['success' => false, 'message' => null, 'error' => null];
 
-    $sql = "SELECT password_hash FROM Users WHERE username = ? AND role = 'Admin' AND is_active = 1";
+    // NOTE: This is the ONLY query that uses standard secure parameter binding ('?')
+    $sql = "SELECT password_hash, role FROM Users WHERE username = ? AND is_active = 1";
     $params = [$username];
     $stmt = sqlsrv_query($conn, $sql, $params);
 
     if ($stmt && sqlsrv_fetch($stmt)) {
         $stored_password = sqlsrv_get_field($stmt, 0); 
+        $user_role = sqlsrv_get_field($stmt, 1); 
 
-        // NOTE: In a real system, use password_verify/hashing. Assuming plain text for this environment.
-        if ($password === $stored_password) {
+        // CRITICAL: Must be an Admin account to grant an override
+        if ($user_role === 'Admin' && $password === $stored_password) {
             $_SESSION['admin_override_authorized'] = time();
             $output['success'] = true;
             $output['message'] = 'Admin override granted.';
             $output['timestamp'] = time(); 
             http_response_code(200);
         } else {
-            $output['error'] = 'Invalid Admin password.';
+            $output['error'] = 'Invalid credentials or user is not an Admin.';
             http_response_code(401);
         }
     } else {
-        $output['error'] = 'Admin user not found.';
+        $output['error'] = 'User not found.';
         http_response_code(404);
     }
     
@@ -226,9 +238,6 @@ sqlsrv_close($conn);
 // PHP for Discount State (for initial load)
 $override_time = isset($_SESSION['admin_override_authorized']) ? $_SESSION['admin_override_authorized'] : 0;
 $override_active_on_load = ($override_time > 0) && (time() - $override_time < 300); // 5 mins validity
-
-// Initial discount rate is based on the *session state* at page load
-$initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -240,7 +249,7 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
         body { font-family: sans-serif; background-color: #f8f9fa; }
-        .bg-cafe { background-color: #5d4037 !important; }
+        .bg-cafe { background-color: #6C544B !important; } 
         .navbar-logo { height: 30px; margin-right: 8px; vertical-align: middle; }
         .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; }
         .menu-item { border: 1px solid #ccc; border-radius: 8px; overflow: hidden; text-align: center; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; background: #fff; }
@@ -260,7 +269,7 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
                 position: absolute;
                 left: 0;
                 top: 0;
-                width: 300px; /* Standard receipt width */
+                width: 300px; 
                 font-size: 10px;
                 font-family: monospace;
                 padding: 10px;
@@ -270,7 +279,7 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
             width: 100%;
             max-width: 300px;
             margin: auto;
-            border: 1px dashed #333; /* For screen preview only */
+            border: 1px dashed #333; 
             padding: 10px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
@@ -285,23 +294,24 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
         <div class="container-fluid">
             <a class="navbar-brand fw-bold" href="#">
                 <img src="logo_bossg.png" alt="Kapihan ni Boss G Logo" class="navbar-logo">
-                Kapihan ni Boss G POS
+                Kapihan ni Boss G POS (<?php echo $is_admin ? 'Admin' : 'Cashier'; ?>)
             </a>
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     <?php if ($is_admin): ?>
                     <li class="nav-item"><a class="nav-link" href="dashboard.php">Dashboard</a></li>
-                    <li class="nav-item"><a class="nav-link active" href="orders.php">POS</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="orders.php">Orders</a></li>
+                    <li class="nav-item"><a class="nav-link" href="product_management.php">Products</a></li> 
+                    <li class="nav-item"><a class="nav-link" href="reports.php">Reports</a></li>
+                    <li class="nav-item"><a class="nav-link" href="users.php">Users & Settings</a></li>
+                    <?php else: ?>
+                    <li class="nav-item"><a class="nav-link active" href="orders.php">Orders</a></li>
                     <?php endif; ?>
                 </ul>
-                <span class="navbar-text me-3">
-                    Logged in as: <strong><?php echo htmlspecialchars($username); ?> (<?php echo htmlspecialchars($_SESSION['user_role']); ?>)</strong>
-                </span>
                 <a href="logout.php" class="btn btn-outline-light">Logout</a>
             </div>
         </div>
     </nav>
-
     <div class="container-fluid mt-3">
         <div class="row">
             <div class="col-md-8">
@@ -356,11 +366,9 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
                                 <span id="discount-amount" class="fw-bold text-danger">-₱0.00</span>
                             </div>
                             
-                            <?php if ($is_admin): ?>
-                                <input type="number" class="form-control form-control-sm" id="discount-input" min="0" max="100" placeholder="Set Custom Discount %" value="0">
-                            <?php else: ?>
+                            <?php if (!$is_admin): ?>
                                 <div id="admin-override-area">
-                                    <div id="override-status" class="mt-1 form-text text-danger text-center" style="display:<?php echo $override_active_on_load ? 'block' : 'none'; ?>">**Admin Override Active** (10% Discount)</div>
+                                    <div id="override-status" class="mt-1 form-text text-danger text-center" style="display:<?php echo $override_active_on_load ? 'block' : 'none'; ?>">**Admin Override Active** (Discounts Authorized)</div>
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -463,9 +471,8 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
         const MENU_DATA = <?php echo json_encode($menu_data); ?>;
         const IS_ADMIN = <?php echo $is_admin ? 'true' : 'false'; ?>;
         const CASHIER_NAME = "<?php echo htmlspecialchars($cashier_name); ?>";
-        // Track the Admin Override timestamp in JS
         let adminOverrideTimestamp = <?php echo $override_active_on_load ? $override_time : 0; ?>;
-        const OVERRIDE_DURATION_SECONDS = 300; // 5 minutes
+        const OVERRIDE_DURATION_SECONDS = 300; 
 
         
         let cart = [];
@@ -481,29 +488,16 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
         // --- CALCULATION FUNCTIONS ---
         
         function getActiveDiscountRate() {
-            // 1. Check for fixed discounts (20% > 10%)
+            // UNIFIED LOGIC: Admin and Cashier both use radio buttons now.
+            
             const seniorPwdRadio = document.getElementById('discount-senior-pwd');
             if (seniorPwdRadio && seniorPwdRadio.checked) return 20; 
             
             const studentRadio = document.getElementById('discount-student');
             if (studentRadio && studentRadio.checked) return 10;
-
-            // 2. Check for Admin/Custom Discount
-            if (IS_ADMIN) {
-                // Admin uses the input field
-                const inputRate = parseFloat(document.getElementById('discount-input').value) || 0;
-                return Math.min(Math.max(inputRate, 0), 100); 
-            } else {
-                // Cashier uses the Admin Override flag tracked in JavaScript
-                const currentTime = Math.floor(Date.now() / 1000);
-                const isOverrideActive = adminOverrideTimestamp > 0 && (currentTime - adminOverrideTimestamp < OVERRIDE_DURATION_SECONDS);
-
-                if (isOverrideActive) {
-                    return 10;
-                }
-                
-                return 0; // No discount active
-            }
+            
+            // If none is checked, return 0 (or fall through to the override check for Cashier)
+            return 0;
         }
         
         function calculateSubtotal() {
@@ -526,45 +520,38 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
             document.getElementById('discount-rate-display').textContent = `${discountRate}%`;
             document.getElementById('discount-amount').textContent = `-₱${discountAmount.toFixed(2)}`;
             document.getElementById('total-amount').textContent = `₱${total.toFixed(2)}`;
+            // FIX: Ensure change due display is always 0 or positive
             document.getElementById('change-due').textContent = `₱${Math.max(0, changeDue).toFixed(2)}`;
 
             const processBtn = document.getElementById('process-order-btn');
             
-            // Enable button only if cart has items AND cash tendered >= total amount
+            // Allow processing only if cart has items and cash tendered is sufficient (or exactly equal)
             processBtn.disabled = cart.length === 0 || changeDue < -0.01; 
             
             const emptyMsg = document.getElementById('empty-cart-message');
             if (emptyMsg) emptyMsg.style.display = cart.length === 0 ? 'block' : 'none';
 
             renderCart();
-            updateOverrideUI(); // Update UI to show/hide override status
+            updateOverrideUI(); 
         }
         
-        // Function to handle UI visibility for the override status
         function updateOverrideUI() {
             if (IS_ADMIN) return;
 
             const currentTime = Math.floor(Date.now() / 1000);
             const isOverrideActive = adminOverrideTimestamp > 0 && (currentTime - adminOverrideTimestamp < OVERRIDE_DURATION_SECONDS);
             
-            // NOTE: overrideBtn is removed from HTML, we only need to manage overrideStatus
             const overrideStatus = document.getElementById('override-status');
             
             if (isOverrideActive) {
                 if (overrideStatus) overrideStatus.style.display = 'block';
-                // Ensure no fixed discount is selected when override is active, for calculation consistency
-                if (document.getElementById('discount-senior-pwd').checked || document.getElementById('discount-student').checked) {
-                    document.getElementById('discount-none').checked = true;
-                }
-
             } else {
                 if (overrideStatus) overrideStatus.style.display = 'none';
-                // Reset timestamp when it expires
                 if(adminOverrideTimestamp > 0) adminOverrideTimestamp = 0;
             }
         }
 
-        // --- RENDERING FUNCTIONS (Unchanged) ---
+        // --- RENDERING FUNCTIONS (No changes needed) ---
         function renderMenu(filterCategory = 'All') {
             const container = document.getElementById('menu-container');
             container.innerHTML = '';
@@ -650,7 +637,7 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
             });
         }
         
-        // --- CART/MODIFIER HANDLERS (Unchanged) ---
+        // --- CART/MODIFIER HANDLERS (No changes needed) ---
         function handleMenuItemClick(item) {
             selectedProduct = item;
             
@@ -659,7 +646,6 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
                 document.getElementById('size-options').style.display = item.isDrink ? 'block' : 'none';
                 document.getElementById('temp-options').style.display = item.needsTemp ? 'block' : 'none';
 
-                // Reset options to defaults when opening modal
                 if (item.isDrink) { document.getElementById('size-small').checked = true; }
                 if (item.needsTemp) { document.getElementById('temp-hot').checked = true; }
                 
@@ -696,7 +682,6 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
             let priceAdjustment = 0;
             
             if (selectedProduct.isDrink) {
-                // Ensure a size radio is actually checked before trying to read the value
                 const sizeRadio = document.querySelector('input[name="size"]:checked');
                 if (sizeRadio) {
                     size = sizeRadio.value;
@@ -704,7 +689,6 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
                 }
             }
             if (selectedProduct.needsTemp) {
-                // Ensure a temp radio is actually checked before trying to read the value
                 const tempRadio = document.querySelector('input[name="temp"]:checked');
                 if (tempRadio) {
                     temp = tempRadio.value;
@@ -736,7 +720,6 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
 
             calculateTotals();
             const modalElement = document.getElementById('modifiersModal');
-            // Safely get or create modal instance to hide it
             const modalInstance = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
             modalInstance.hide();
         }
@@ -752,30 +735,13 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
         }
 
 
-        // --- DISCOUNT/OVERRIDE HANDLERS ---
+        // --- DISCOUNT/OVERRIDE HANDLERS (Simplified) ---
         function handleDiscountChange() {
-            const seniorPwdChecked = document.getElementById('discount-senior-pwd').checked;
-            const studentChecked = document.getElementById('discount-student').checked;
-            
-            if (seniorPwdChecked || studentChecked) {
-                if (document.getElementById('discount-input')) {
-                    document.getElementById('discount-input').value = 0;
-                }
-                
-                if (!IS_ADMIN) {
-                    // Fixed discounts automatically clear the temporary override flag
-                    adminOverrideTimestamp = 0;
-                    updateOverrideUI();
-                }
-            }
-            
+            // UNIFIED LOGIC: This function simply recalculates totals based on the selected radio button.
             calculateTotals();
         }
 
         async function handleAdminOverride() {
-            // Force 'No Discount' radio to be active when requesting Admin Override
-            document.getElementById('discount-none').checked = true;
-            
             const username = document.getElementById('admin-username').value;
             const password = document.getElementById('admin-password').value;
             const statusDiv = document.getElementById('override-modal-status');
@@ -794,15 +760,9 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
                 const modalInstance = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
 
                 if (response.ok && result.success) {
-                    if (!IS_ADMIN) {
-                        adminOverrideTimestamp = result.timestamp; 
-                    }
-                    
-                    calculateTotals(); // Recalculate to show 10% discount
-                    
+                    adminOverrideTimestamp = result.timestamp; 
+                    calculateTotals(); 
                     modalInstance.hide();
-                    
-                    // Immediately re-run the process order once authorized.
                     processOrder(); 
 
                 } else {
@@ -810,49 +770,39 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
                     if (!response.ok && response.status !== 401 && response.status !== 404) {
                          statusDiv.textContent = 'Network or server error during authorization.';
                     }
-                    // Re-enable the button if authorization fails
                     document.getElementById('process-order-btn').disabled = false;
                 }
             } catch (e) {
                 statusDiv.textContent = 'Network or server error during authorization.';
-                // Re-enable the button on network failure
                 document.getElementById('process-order-btn').disabled = false;
             }
         }
 
-        // --- PROCESS ORDER (REQUIRES OVERRIDE FOR DISCOUNT) ---
+        // --- PROCESS ORDER ---
         
         async function processOrder() {
             if (cart.length === 0) return;
             
             const currentDiscountRate = getActiveDiscountRate(); 
             
-            // -------------------------------------------------------------------
-            // **DISCOUNT AUTHORIZATION CHECK**
-            // -------------------------------------------------------------------
+            // DISCOUNT AUTHORIZATION CHECK: ONLY for non-Admin users.
             if (currentDiscountRate > 0 && !IS_ADMIN) {
                 const currentTime = Math.floor(Date.now() / 1000);
                 const isOverrideActive = adminOverrideTimestamp > 0 && (currentTime - adminOverrideTimestamp < OVERRIDE_DURATION_SECONDS);
 
-                // If a discount is selected and the override is NOT active, request override.
                 if (!isOverrideActive) {
                     
-                    // Force the Process button to be disabled until override is successful
                     document.getElementById('process-order-btn').disabled = true;
 
-                    // Show the Admin Override Modal
                     document.getElementById('admin-username').value = '';
                     document.getElementById('admin-password').value = '';
                     document.getElementById('override-modal-status').textContent = 'Admin credentials required to authorize the discount.';
                     
                     new bootstrap.Modal(document.getElementById('adminOverrideModal')).show();
                     
-                    // STOP the order process here. It will resume via the 'Authorize' button.
                     return; 
                 }
             }
-            // -------------------------------------------------------------------
-
 
             const processBtn = document.getElementById('process-order-btn');
             processBtn.disabled = true;
@@ -866,7 +816,7 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
             const changeDue = cashTendered - totalAmount;
             
             if (changeDue < -0.01) {
-                 alert('Error: Cash tendered is insufficient.');
+                 alert(`Error: Cash tendered is insufficient. Required: ₱${totalAmount.toFixed(2)}`);
                  processBtn.disabled = false;
                  processBtn.textContent = 'Process Order';
                  return;
@@ -883,7 +833,6 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
             };
 
             try {
-                // Request sent to orders.php?action=process_order
                 const response = await fetch('orders.php?action=process_order', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -904,7 +853,6 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
                 alert('An error occurred while processing the order. (Check console for network error)');
                 console.error("Process Order Error:", e);
             } finally {
-                // Ensure the button is re-enabled if the transaction fails after authorization
                 processBtn.disabled = false;
                 processBtn.textContent = 'Process Order';
                 
@@ -918,28 +866,21 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
             document.getElementById('discount-none').checked = true; 
             document.getElementById('cash-tendered').value = '0.00'; 
             
-            if (!IS_ADMIN) {
+            // Only clear the timestamp if it's not an Admin, or if we are forced to clear server state
+            if (!IS_ADMIN && clearServerOverride) {
                 adminOverrideTimestamp = 0;
-            }
-            
-            calculateTotals();
-            
-            if (clearServerOverride && !IS_ADMIN) {
                 try {
-                    // Send request to server to clear session flag
                     await fetch('orders.php?action=clear_override'); 
                 } catch(e) {
                     console.warn("Could not clear server override.");
                 }
-            } else if (IS_ADMIN) {
-                const discountInput = document.getElementById('discount-input');
-                if (discountInput) discountInput.value = 0;
             }
             
+            calculateTotals(); 
             updateOverrideUI(); 
         }
         
-        // --- RECEIPT FUNCTION (Unchanged) ---
+        // --- RECEIPT FUNCTION (No changes needed) ---
         function printReceipt(orderData, orderId) {
             const now = new Date();
             const receiptHtml = `
@@ -1018,38 +959,26 @@ $initial_discount_rate = ($override_active_on_load && !$is_admin) ? '10' : '0';
         document.addEventListener('DOMContentLoaded', () => {
             renderMenu('All'); 
             
-            if (IS_ADMIN) {
-                 document.getElementById('discount-input').value = <?php echo $initial_discount_rate; ?>;
-            }
-            
-            // Initial call to set up totals and UI state
             calculateTotals(); 
             
-            // New listener for Cash Tendered
             document.getElementById('cash-tendered').addEventListener('input', calculateTotals);
 
-            // Discount listeners
             document.querySelectorAll('.discount-type').forEach(radio => {
                 radio.addEventListener('change', handleDiscountChange);
             });
-            document.getElementById('discount-input')?.addEventListener('input', handleDiscountChange);
-
-            // Modal/Process listeners
-            // NOTE: The separate override-btn listener is now removed as per user request.
+            // Custom discount input is removed, so no need to listen for its input.
 
             document.getElementById('authorize-override-btn')?.addEventListener('click', handleAdminOverride);
             document.getElementById('process-order-btn').addEventListener('click', processOrder);
             document.getElementById('clear-order-btn').addEventListener('click', () => clearOrder(true));
             
-            // Add to Cart button listener
             const addToCartBtn = document.getElementById('add-to-cart-btn');
             if (addToCartBtn) {
                 addToCartBtn.addEventListener('click', handleAddToCart);
             }
             
-            // Set a timer to periodically check if the override has expired (for non-admin users)
             if (!IS_ADMIN) {
-                setInterval(updateOverrideUI, 5000); // Check every 5 seconds
+                setInterval(updateOverrideUI, 5000); 
             }
         });
     </script>
