@@ -232,7 +232,7 @@ sqlsrv_close($conn);
                             <thead>
                                 <tr>
                                     <th>Order ID</th>
-                                    <th>Cashier</th>
+                                    <th>User</th>
                                     <th>Time</th>
                                     <th>Total</th>
                                 </tr>
