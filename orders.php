@@ -167,7 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
     $password = $data['password'];
     $output = ['success' => false, 'message' => null, 'error' => null];
 
-    // NOTE: This is the ONLY query that uses standard secure parameter binding ('?')
+    
     $sql = "SELECT password_hash, role FROM Users WHERE username = ? AND is_active = 1";
     $params = [$username];
     $stmt = sqlsrv_query($conn, $sql, $params);
@@ -244,7 +244,7 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kapihan ni Boss G POS - Order Entry</title>
+    <title>Kapihan ni Boss G - Order Entry</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
@@ -292,14 +292,13 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-cafe shadow-sm">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="#">
+            <a class="navbar-brand fw-bold" href="dashboard.php">
                 <img src="logo_bossg.png" alt="Kapihan ni Boss G Logo" class="navbar-logo">
-                Kapihan ni Boss G POS (<?php echo $is_admin ? 'Admin' : 'Cashier'; ?>)
+                Kapihan ni Boss G (<?php echo $is_admin ? 'Admin' : 'Cashier'; ?>)
             </a>
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     <?php if ($is_admin): ?>
-                    <li class="nav-item"><a class="nav-link" href="dashboard.php">Dashboard</a></li>
                     <li class="nav-item"><a class="nav-link active" href="orders.php">Orders</a></li>
                     <li class="nav-item"><a class="nav-link" href="product_management.php">Products</a></li> 
                     <li class="nav-item"><a class="nav-link" href="reports.php">Reports</a></li>

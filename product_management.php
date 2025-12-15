@@ -158,14 +158,13 @@ unset($_SESSION['message']);
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-cafe shadow-sm">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="#">
+            <a class="navbar-brand fw-bold" href="dashboard.php">
                 <img src="logo_bossg.png" alt="Kapihan ni Boss G Logo" class="navbar-logo">
-                Kapihan ni Boss G POS (Admin)
+                Kapihan ni Boss G (Admin)
             </a>
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     <?php if ($_SESSION['user_role'] === 'Admin'): ?>
-                        <li class="nav-item"><a class="nav-link" href="dashboard.php">Dashboard</a></li>
                         <li class="nav-item"><a class="nav-link" href="orders.php">Orders</a></li> 
                         <li class="nav-item"><a class="nav-link active" href="product_management.php">Products</a></li> 
                         <li class="nav-item"><a class="nav-link" href="reports.php">Reports</a></li>
