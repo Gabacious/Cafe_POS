@@ -224,7 +224,7 @@ unset($_SESSION['message']);
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
-        .bg-cafe { background-color: #6C544B !important; } 
+        .bg-cafe { background-color: #5d4037 !important; } 
         .navbar-logo { height: 30px; margin-right: 8px; vertical-align: middle; }
     </style>
 </head>

@@ -249,7 +249,7 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
         body { font-family: sans-serif; background-color: #f8f9fa; }
-        .bg-cafe { background-color: #6C544B !important; } 
+        .bg-cafe { background-color: #5d4037 !important; } 
         .navbar-logo { height: 30px; margin-right: 8px; vertical-align: middle; }
         .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; }
         .menu-item { border: 1px solid #ccc; border-radius: 8px; overflow: hidden; text-align: center; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; background: #fff; }

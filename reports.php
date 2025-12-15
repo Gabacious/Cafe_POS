@@ -169,7 +169,7 @@ sqlsrv_close($conn);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kapihan ni Boss G POS - Sales Reports</title>
+    <title>Kapihan ni Boss G - Sales Reports</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
@@ -184,7 +184,7 @@ sqlsrv_close($conn);
         <div class="container-fluid">
             <a class="navbar-brand fw-bold" href="dashboard.php">
                 <img src="logo_bossg.png" alt="Kapihan ni Boss G Logo" class="navbar-logo">
-                Kapihan ni Boss G POS (Admin)
+                Kapihan ni Boss G (Admin)
             </a>
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
@@ -287,7 +287,7 @@ sqlsrv_close($conn);
             
             <div class="col-lg-6 mb-4">
                 <div class="card shadow h-100">
-                    <div class="card-header bg-warning text-dark"><i class="bi bi-star-fill me-2"></i>Top 10 Selling Products</div>
+                    <div class="card-header bg-warning text-dark"><i class="bi bi-star-fill me-2"></i>Top Selling Products</div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-sm table-hover mb-0">
