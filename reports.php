@@ -2,6 +2,12 @@
 // reports.php
 session_start();
 
+// --- 1. CONFIGURATION CHANGES (NEW) ---
+// Set the default timezone to ensure PHP's date() function uses the local time (Asia/Manila).
+// This is critical for correctly calculating "today" and "yesterday" sales, especially near midnight.
+date_default_timezone_set('Asia/Manila');
+// --- END CONFIGURATION CHANGES ---
+
 // --- ACCESS CONTROL (Admin only) ---
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'Admin') {
     header("Location: login.php");
@@ -23,14 +29,14 @@ if ($conn === false) {
 }
 // --- END CONNECTION BLOCK ---
 
-// --- 1. HANDLE INPUT AND FILTERS ---
+// --- 2. HANDLE INPUT AND FILTERS ---
 $report_period = $_GET['period'] ?? 'daily'; // Default to 'daily'
 $filter_date = $_GET['filter_date'] ?? date('Y-m-d'); // Default date for custom/daily view
 $error_message = '';
 
 $where_clause = "";
 $report_title_suffix = "";
-$params = []; // For parameterized queries
+$params = []; // For parameterized queries (used by monthly/weekly reports)
 
 // Determine the SQL WHERE clause and title based on the selected period
 switch ($report_period) {
@@ -39,6 +45,7 @@ switch ($report_period) {
         $where_clause = "WHERE o.order_date >= DATEADD(wk, DATEDIFF(wk, 0, GETDATE()), 0) 
                          AND o.order_date < DATEADD(wk, DATEDIFF(wk, 0, GETDATE()), 7)";
         $report_title_suffix = " (This Week)";
+        // $params remains empty for this SQL statement
         break;
 
     case 'monthly':
@@ -46,20 +53,36 @@ switch ($report_period) {
         $where_clause = "WHERE MONTH(o.order_date) = MONTH(GETDATE()) 
                          AND YEAR(o.order_date) = YEAR(GETDATE())";
         $report_title_suffix = " (This Month)";
+        // $params remains empty for this SQL statement
         break;
 
     case 'daily':
     default:
-        // Filter for a specific day (uses the date picker value or today's date)
-        $where_clause = "WHERE CAST(o.order_date AS DATE) = ?";
-        $params[] = $filter_date;
+        // --- UPDATED DAILY FILTER LOGIC (No Parameters) ---
+        // We set $params to an empty array since we are using string concatenation for the WHERE clause
+        $params = [];
+        
+        // 1. Define the START of the selected day ('YYYY-MM-DD 00:00:00')
+        $start_of_day = $filter_date . ' 00:00:00'; 
+        
+        // 2. Define the END of the selected day (Start of the NEXT day)
+        // This calculates the date string for the start of the next day (e.g., 2025-12-18)
+        $next_day_date = date('Y-m-d', strtotime($filter_date . ' +1 day')); 
+        $end_of_day = $next_day_date . ' 00:00:00'; 
+
+        // SQL: Use string concatenation to safely include the full day's data (time-inclusive).
+        // This selects orders >= start_of_day AND < end_of_day (start of next day).
+        $where_clause = "WHERE o.order_date >= '$start_of_day' AND o.order_date < '$end_of_day'";
+        // --- END UPDATED DAILY FILTER LOGIC ---
+        
         $report_title_suffix = " (".date('F j, Y', strtotime($filter_date)).")";
         $report_period = 'daily'; // Ensure 'daily' is set as the active button
         break;
 }
 
 
-// --- 2. FETCH SUMMARY DATA ---
+// --- 3. FETCH SUMMARY DATA ---
+// NOTE: $params will be empty for daily/weekly/monthly reports, which sqlsrv_query can handle.
 $sql_summary = "
     SELECT 
         COUNT(order_id) AS total_orders, 
@@ -89,7 +112,7 @@ if ($stmt_summary) {
 }
 
 
-// --- 3. FETCH DETAILED ORDER LIST ---
+// --- 4. FETCH DETAILED ORDER LIST ---
 $order_list = [];
 $sql_orders = "
     SELECT TOP 50
@@ -118,7 +141,7 @@ if ($stmt_orders) {
 }
 
 
-// --- 4. FETCH SALES BY CATEGORY REPORT ---
+// --- 5. FETCH SALES BY CATEGORY REPORT ---
 $sales_by_category = [];
 $sql_category_sales = "
     SELECT 
@@ -142,7 +165,7 @@ if ($stmt_category) {
     $error_message .= "<br>Error fetching category sales: " . print_r(sqlsrv_errors(), true);
 }
 
-// --- 5. FETCH TOP SELLING PRODUCTS ---
+// --- 6. FETCH TOP SELLING PRODUCTS ---
 $top_products = [];
 $sql_top_products = "
     SELECT TOP 10
@@ -167,7 +190,7 @@ if ($stmt_top_products) {
 }
 
 
-// --- 6. FETCH SALES BY CASHIER ---
+// --- 7. FETCH SALES BY CASHIER ---
 $sales_by_cashier = [];
 $sql_cashier_sales = "
     SELECT 
