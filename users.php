@@ -1,5 +1,5 @@
 <?php
-// user_settings.php (Updated with Role Check and User CRUD Logic)
+// user_settings.php
 session_start();
 
 // --- DATABASE CONNECTION BLOCK ---
@@ -24,7 +24,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'Admin') {
     exit();
 }
 
-// --- CUSTOM STRING ESCAPE FUNCTION (REQUIRED FIX) ---
+// --- CUSTOM STRING ESCAPE FUNCTION ---
 if (!function_exists('sqlsrv_escape_string')) {
     function sqlsrv_escape_string($string) {
         if (is_null($string)) return ''; 
@@ -107,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-    // --- 3. DELETE USER (SOFT DELETE FIX) ---
+    // --- 3. DELETE USER ---
     } elseif ($action === 'delete') {
         $user_id = intval($_POST['user_id']);
         

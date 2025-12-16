@@ -1,5 +1,5 @@
 <?php
-// reports.php (Updated with Daily, Weekly, and Monthly Filtering)
+// reports.php
 session_start();
 
 // --- ACCESS CONTROL (Admin only) ---
@@ -106,7 +106,7 @@ $stmt_orders = sqlsrv_query($conn, $sql_orders, $params);
 
 if ($stmt_orders) {
     while ($row = sqlsrv_fetch_array($stmt_orders, SQLSRV_FETCH_ASSOC)) {
-        // Only format date if it's a DateTime object (MS-SQL driver handles this)
+        // Only format date if it's a DateTime object
         if ($row['order_date'] instanceof DateTime) {
             $row['order_date'] = $row['order_date']->format('Y-m-d H:i:s');
         }

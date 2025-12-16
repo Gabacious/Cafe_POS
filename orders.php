@@ -1,5 +1,5 @@
 <?php
-// orders.php (Updated with Full Role Control)
+// orders.php
 session_start();
 
 // --- DATABASE CONNECTION BLOCK ---
@@ -39,7 +39,7 @@ $cashier_name = $_SESSION['username'];
 $is_admin = $_SESSION['user_role'] === 'Admin';
 
 
-// --- CUSTOM STRING ESCAPE FUNCTION (REQUIRED FIX) ---
+// --- CUSTOM STRING ESCAPE FUNCTION---
 if (!function_exists('sqlsrv_escape_string')) {
     function sqlsrv_escape_string($string) {
         if (is_null($string)) return ''; 
@@ -550,7 +550,7 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
             }
         }
 
-        // --- RENDERING FUNCTIONS (No changes needed) ---
+        // --- RENDERING FUNCTIONS ---
         function renderMenu(filterCategory = 'All') {
             const container = document.getElementById('menu-container');
             container.innerHTML = '';
@@ -636,7 +636,7 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
             });
         }
         
-        // --- CART/MODIFIER HANDLERS (No changes needed) ---
+        // --- CART/MODIFIER HANDLERS ---
         function handleMenuItemClick(item) {
             selectedProduct = item;
             
@@ -734,7 +734,7 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
         }
 
 
-        // --- DISCOUNT/OVERRIDE HANDLERS (Simplified) ---
+        // --- DISCOUNT/OVERRIDE HANDLERS ---
         function handleDiscountChange() {
             // UNIFIED LOGIC: This function simply recalculates totals based on the selected radio button.
             calculateTotals();
@@ -879,7 +879,7 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
             updateOverrideUI(); 
         }
         
-        // --- RECEIPT FUNCTION (No changes needed) ---
+        // --- RECEIPT FUNCTION ---
         function printReceipt(orderData, orderId) {
             const now = new Date();
             const receiptHtml = `

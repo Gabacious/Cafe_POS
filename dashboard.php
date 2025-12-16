@@ -1,5 +1,5 @@
 <?php
-// dashboard.php (Admin Dashboard with Dynamic KPIs)
+// dashboard.php
 session_start();
 
 // --- DATABASE CONNECTION BLOCK (Using settings from users.php) ---
