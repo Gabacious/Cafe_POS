@@ -321,21 +321,6 @@ unset($_SESSION['message']);
             </div>
         </div>
 
-        <div class="card p-4 mt-4 shadow-sm">
-            <h4 class="card-title">System Settings (Placeholder)</h4>
-            <form>
-                <div class="mb-3">
-                    <label for="taxRate" class="form-label">Default Tax Rate (%)</label>
-                    <input type="number" step="0.01" class="form-control" id="taxRate" value="0.00">
-                </div>
-                <div class="mb-3">
-                    <label for="storeName" class="form-label">Store Name (for Receipt)</label>
-                    <input type="text" class="form-control" id="storeName" value="KAPIHAN NI BOSS G">
-                </div>
-                <button type="submit" class="btn btn-success">Save Settings</button>
-            </form>
-        </div>
-    </div>
 
     <div class="modal fade" id="userModal" tabindex="-1" aria-labelledby="userModalLabel" aria-hidden="true">
         <div class="modal-dialog">

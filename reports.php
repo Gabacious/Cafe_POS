@@ -1,5 +1,5 @@
 <?php
-// reports.php (CORRECTED AGAIN: Changed 'ProductName' to 'name')
+// reports.php (Updated with Daily, Weekly, and Monthly Filtering)
 session_start();
 
 // --- ACCESS CONTROL (Admin only) ---
@@ -24,8 +24,40 @@ if ($conn === false) {
 // --- END CONNECTION BLOCK ---
 
 // --- 1. HANDLE INPUT AND FILTERS ---
-$filter_date = $_GET['filter_date'] ?? date('Y-m-d'); // Default to today
+$report_period = $_GET['period'] ?? 'daily'; // Default to 'daily'
+$filter_date = $_GET['filter_date'] ?? date('Y-m-d'); // Default date for custom/daily view
 $error_message = '';
+
+$where_clause = "";
+$report_title_suffix = "";
+$params = []; // For parameterized queries
+
+// Determine the SQL WHERE clause and title based on the selected period
+switch ($report_period) {
+    case 'weekly':
+        // MS-SQL: Filter for the current week (DATEDIFF(wk, 0, GETDATE()) gets the week number starting from 1900-01-01)
+        $where_clause = "WHERE o.order_date >= DATEADD(wk, DATEDIFF(wk, 0, GETDATE()), 0) 
+                         AND o.order_date < DATEADD(wk, DATEDIFF(wk, 0, GETDATE()), 7)";
+        $report_title_suffix = " (This Week)";
+        break;
+
+    case 'monthly':
+        // MS-SQL: Filter for the current month and year
+        $where_clause = "WHERE MONTH(o.order_date) = MONTH(GETDATE()) 
+                         AND YEAR(o.order_date) = YEAR(GETDATE())";
+        $report_title_suffix = " (This Month)";
+        break;
+
+    case 'daily':
+    default:
+        // Filter for a specific day (uses the date picker value or today's date)
+        $where_clause = "WHERE CAST(o.order_date AS DATE) = ?";
+        $params[] = $filter_date;
+        $report_title_suffix = " (".date('F j, Y', strtotime($filter_date)).")";
+        $report_period = 'daily'; // Ensure 'daily' is set as the active button
+        break;
+}
+
 
 // --- 2. FETCH SUMMARY DATA ---
 $sql_summary = "
@@ -33,11 +65,10 @@ $sql_summary = "
         COUNT(order_id) AS total_orders, 
         SUM(total_amount) AS total_sales,
         SUM(discount_amount) AS total_discount
-    FROM Orders 
-    WHERE CAST(order_date AS DATE) = ?";
+    FROM Orders o
+    $where_clause";
 
-$params_summary = [&$filter_date];
-$stmt_summary = sqlsrv_query($conn, $sql_summary, $params_summary);
+$stmt_summary = sqlsrv_query($conn, $sql_summary, $params);
 
 $summary = [
     'total_orders' => 0,
@@ -48,6 +79,7 @@ $summary = [
 if ($stmt_summary) {
     if ($row = sqlsrv_fetch_array($stmt_summary, SQLSRV_FETCH_ASSOC)) {
         $summary['total_orders'] = $row['total_orders'] ?? 0;
+        // Use a ternary operator to handle NULL values from SUM
         $summary['total_sales'] = $row['total_sales'] ?? 0.00;
         $summary['total_discount'] = $row['total_discount'] ?? 0.00;
     }
@@ -67,15 +99,17 @@ $sql_orders = "
         u.username AS cashier_name
     FROM Orders o
     INNER JOIN Users u ON o.cashier_id = u.user_id
-    WHERE CAST(o.order_date AS DATE) = ?
+    $where_clause
     ORDER BY o.order_date DESC";
 
-$params_orders = [&$filter_date];
-$stmt_orders = sqlsrv_query($conn, $sql_orders, $params_orders);
+$stmt_orders = sqlsrv_query($conn, $sql_orders, $params);
 
 if ($stmt_orders) {
     while ($row = sqlsrv_fetch_array($stmt_orders, SQLSRV_FETCH_ASSOC)) {
-        $row['order_date'] = $row['order_date']->format('Y-m-d H:i:s');
+        // Only format date if it's a DateTime object (MS-SQL driver handles this)
+        if ($row['order_date'] instanceof DateTime) {
+            $row['order_date'] = $row['order_date']->format('Y-m-d H:i:s');
+        }
         $order_list[] = $row;
     }
     sqlsrv_free_stmt($stmt_orders);
@@ -84,7 +118,7 @@ if ($stmt_orders) {
 }
 
 
-// --- 4. FETCH SALES BY CATEGORY REPORT (CHECKING name) ---
+// --- 4. FETCH SALES BY CATEGORY REPORT ---
 $sales_by_category = [];
 $sql_category_sales = "
     SELECT 
@@ -93,12 +127,11 @@ $sql_category_sales = "
     FROM Orders o
     INNER JOIN Order_Items oi ON o.order_id = oi.order_id
     INNER JOIN Products p ON oi.product_id = p.product_id
-    WHERE CAST(o.order_date AS DATE) = ?
+    $where_clause
     GROUP BY p.category
     ORDER BY category_subtotal DESC";
 
-$params_category = [&$filter_date];
-$stmt_category = sqlsrv_query($conn, $sql_category_sales, $params_category);
+$stmt_category = sqlsrv_query($conn, $sql_category_sales, $params);
 
 if ($stmt_category) {
     while ($row = sqlsrv_fetch_array($stmt_category, SQLSRV_FETCH_ASSOC)) {
@@ -109,25 +142,23 @@ if ($stmt_category) {
     $error_message .= "<br>Error fetching category sales: " . print_r(sqlsrv_errors(), true);
 }
 
-// --- 5. NEW: FETCH TOP SELLING PRODUCTS (CORRECTED TO p.name) ---
+// --- 5. FETCH TOP SELLING PRODUCTS ---
 $top_products = [];
 $sql_top_products = "
     SELECT TOP 10
-        p.name, -- NEW CORRECTED COLUMN NAME
+        p.name, 
         SUM(oi.quantity) AS total_quantity_sold
     FROM Orders o
     INNER JOIN Order_Items oi ON o.order_id = oi.order_id
     INNER JOIN Products p ON oi.product_id = p.product_id
-    WHERE CAST(o.order_date AS DATE) = ?
-    GROUP BY p.name -- NEW CORRECTED COLUMN NAME
+    $where_clause
+    GROUP BY p.name 
     ORDER BY total_quantity_sold DESC";
 
-$params_top_products = [&$filter_date];
-$stmt_top_products = sqlsrv_query($conn, $sql_top_products, $params_top_products);
+$stmt_top_products = sqlsrv_query($conn, $sql_top_products, $params);
 
 if ($stmt_top_products) {
     while ($row = sqlsrv_fetch_array($stmt_top_products, SQLSRV_FETCH_ASSOC)) {
-        // We use 'name' as the array key for display
         $top_products[] = $row;
     }
     sqlsrv_free_stmt($stmt_top_products);
@@ -136,7 +167,7 @@ if ($stmt_top_products) {
 }
 
 
-// --- 6. NEW: FETCH SALES BY CASHIER ---
+// --- 6. FETCH SALES BY CASHIER ---
 $sales_by_cashier = [];
 $sql_cashier_sales = "
     SELECT 
@@ -145,12 +176,11 @@ $sql_cashier_sales = "
         SUM(o.total_amount) AS total_sales
     FROM Orders o
     INNER JOIN Users u ON o.cashier_id = u.user_id
-    WHERE CAST(o.order_date AS DATE) = ?
+    $where_clause
     GROUP BY u.username
     ORDER BY total_sales DESC";
 
-$params_cashier_sales = [&$filter_date];
-$stmt_cashier_sales = sqlsrv_query($conn, $sql_cashier_sales, $params_cashier_sales);
+$stmt_cashier_sales = sqlsrv_query($conn, $sql_cashier_sales, $params);
 
 if ($stmt_cashier_sales) {
     while ($row = sqlsrv_fetch_array($stmt_cashier_sales, SQLSRV_FETCH_ASSOC)) {
@@ -177,6 +207,7 @@ sqlsrv_close($conn);
         .bg-cafe { background-color: #5d4037 !important; }
         .navbar-logo { height: 30px; margin-right: 8px; vertical-align: middle; }
         .card-icon { font-size: 2.5rem; color: #5d4037; }
+        .btn-period.active { background-color: #6f4e37; color: white; border-color: #6f4e37; }
     </style>
 </head>
 <body>
@@ -199,7 +230,7 @@ sqlsrv_close($conn);
     </nav>
 
     <div class="container mt-4">
-        <h3 class="mb-4 text-secondary">Detailed Sales Reports</h3>
+        <h3 class="mb-4 text-secondary">Detailed Sales Reports <?= $report_title_suffix; ?></h3>
 
         <?php if (!empty($error_message)): ?>
             <div class="alert alert-danger" role="alert">
@@ -209,16 +240,21 @@ sqlsrv_close($conn);
 
         <div class="card shadow-sm mb-4">
             <div class="card-body">
-                <form action="reports.php" method="GET" class="row align-items-end">
+                <div class="d-flex flex-wrap align-items-center mb-3">
+                    <label class="form-label fw-bold me-3 mb-0">Quick View:</label>
+                    <a href="?period=daily" class="btn btn-outline-secondary btn-period me-2 <?= $report_period === 'daily' ? 'active' : ''; ?>">Daily</a>
+                    <a href="?period=weekly" class="btn btn-outline-secondary btn-period me-2 <?= $report_period === 'weekly' ? 'active' : ''; ?>">Weekly</a>
+                    <a href="?period=monthly" class="btn btn-outline-secondary btn-period me-4 <?= $report_period === 'monthly' ? 'active' : ''; ?>">Monthly</a>
+                </div>
+
+                <form action="reports.php" method="GET" class="row align-items-center">
+                    <input type="hidden" name="period" value="daily">
                     <div class="col-md-3">
-                        <label for="filter_date" class="form-label">Select Date:</label>
-                        <input type="date" class="form-control" id="filter_date" name="filter_date" value="<?php echo htmlspecialchars($filter_date); ?>" max="<?php echo date('Y-m-d'); ?>">
+                        <label for="filter_date" class="form-label">Select Specific Day:</label>
+                        <input type="date" class="form-control" id="filter_date" name="filter_date" value="<?php echo htmlspecialchars($filter_date); ?>" max="<?php echo date('Y-m-d'); ?>" <?= $report_period !== 'daily' ? 'disabled' : ''; ?>>
                     </div>
-                    <div class="col-md-3">
-                        <button type="submit" class="btn btn-primary">Load Report</button>
-                    </div>
-                    <div class="col-md-6 text-end">
-                        <p class="mb-0 fw-bold fs-5">Report for: <span class="text-cafe"><?php echo date('F j, Y', strtotime($filter_date)); ?></span></p>
+                    <div class="col-md-3 mt-3 mt-md-0">
+                        <button type="submit" class="btn btn-primary" <?= $report_period !== 'daily' ? 'disabled' : ''; ?>>Load Date</button>
                     </div>
                 </form>
             </div>
@@ -374,7 +410,7 @@ sqlsrv_close($conn);
                                             </tr>
                                         <?php endforeach; ?>
                                     <?php else: ?>
-                                        <tr><td colspan="4" class="text-center text-muted">No orders found for <?php echo date('F j, Y', strtotime($filter_date)); ?>.</td></tr>
+                                        <tr><td colspan="4" class="text-center text-muted">No orders found for this period.</td></tr>
                                     <?php endif; ?>
                                 </tbody>
                             </table>
