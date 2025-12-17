@@ -67,10 +67,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
     $discountRate = round(floatval($data['discountRate']), 2);
     $discountAmount = round(floatval($data['discountAmount']), 2);
     $totalAmount = round(floatval($data['totalAmount']), 2);
+    $paymentMethod = $data['paymentMethod'] ?? 'Cash';
     
     // String values must be escaped
     $safe_cashier_id = sqlsrv_escape_string($cashier_id);
-    $safe_payment_method = sqlsrv_escape_string('Cash'); 
+    $safe_payment_method = sqlsrv_escape_string($paymentMethod);  // Now dynamic!
     $orderId = null;
 
     if (sqlsrv_begin_transaction($conn) === false) {
@@ -134,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
             unset($_SESSION['admin_override_authorized']);
         }
 
-        echo json_encode(['success' => true, 'orderId' => $orderId, 'message' => 'Order processed.']);
+        echo json_encode(['success' => true, 'orderId' => $orderId, 'message' => 'Order processed.', 'paymentMethod' => $paymentMethod]);
 
     } catch (Exception $e) {
         // Rollback on any failure
@@ -260,7 +261,9 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
         .order-list-item .name { flex-grow: 1; margin-left: 10px;}
         .order-list-item .price { font-weight: bold; width: 70px; text-align: right; }
         .order-list-item .qty-control { width: 100px; }
-
+        .qr-code-animate { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        
         /* Receipt Styles for Printing */
         @media print {
             body * { visibility: hidden; }
@@ -376,7 +379,50 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
                             <span id="total-amount" class="fw-bolder text-success">₱0.00</span>
                         </div>
                         
+                        <!-- Payment Method Section -->
                         <div class="mb-3 p-2 border rounded bg-white">
+                            <h6 class="mb-2">Payment Method:</h6>
+                            <div class="d-flex flex-wrap mb-2">
+                                <div class="form-check form-check-inline me-3">
+                                    <input class="form-check-input payment-method" type="radio" 
+                                           name="payment-method" id="cash" value="Cash" checked>
+                                    <label class="form-check-label" for="cash">
+                                        💵 <strong>Cash</strong>
+                                    </label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input payment-method" type="radio" 
+                                           name="payment-method" id="gcash" value="GCash">
+                                    <label class="form-check-label" for="gcash">
+                                        📱 <strong>GCash</strong>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <!-- QR Code Container (Hidden by default) -->
+                            <div id="gcash-qr-container" style="display: none;">
+                                <hr class="my-2">
+                                <div class="alert alert-info mb-2">
+                                    <i class="bi bi-qr-code"></i> Please scan to pay via GCash
+                                </div>
+                                <div class="text-center">
+                                    <!-- YOUR ACTUAL GCASH QR CODE -->
+                                    <img src="gcash_qr_code.png" 
+                                         id="gcash-qr-code" 
+                                         class="img-fluid border p-2 qr-code-animate" 
+                                         style="max-width: 200px;"
+                                         alt="GCash QR Code">
+                                    <p class="mt-2 small text-muted">
+                                        Scan with GCash app to pay<br>
+                                        <strong>Kapihan ni Boss G</strong><br>
+                                        Amount to pay: <strong id="gcash-amount">₱0.00</strong>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Cash Tendered Section (Shows only for Cash) -->
+                        <div class="mb-3 p-2 border rounded bg-white" id="cash-tendered-section">
                             <h6 class="mb-2">Cash Tendered:</h6>
                             <input type="number" class="form-control" id="cash-tendered" min="0" placeholder="Enter Cash Amount" value="0.00">
                             <div class="d-flex justify-content-between mt-2">
@@ -472,11 +518,13 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
         const CASHIER_NAME = "<?php echo htmlspecialchars($cashier_name); ?>";
         let adminOverrideTimestamp = <?php echo $override_active_on_load ? $override_time : 0; ?>;
         const OVERRIDE_DURATION_SECONDS = 300; 
-
+        const GCASH_NUMBER = "+639178882123"; // Your GCash number
+        
         
         let cart = [];
         let selectedProduct = null;
         let discountRate = 0;
+        let paymentMethod = 'Cash'; // Default payment method
 
         const MODAL_SIZE_PRICES = {
             'Small': 0.00,
@@ -514,24 +562,38 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
             const cashTendered = parseFloat(cashTenderedInput.value) || 0;
             const changeDue = cashTendered - total;
 
-
             document.getElementById('subtotal').textContent = `₱${subtotal.toFixed(2)}`;
             document.getElementById('discount-rate-display').textContent = `${discountRate}%`;
             document.getElementById('discount-amount').textContent = `-₱${discountAmount.toFixed(2)}`;
             document.getElementById('total-amount').textContent = `₱${total.toFixed(2)}`;
+            
+            // Update GCash amount display
+            updateGCashQRCode(total);
+            
             // FIX: Ensure change due display is always 0 or positive
             document.getElementById('change-due').textContent = `₱${Math.max(0, changeDue).toFixed(2)}`;
 
             const processBtn = document.getElementById('process-order-btn');
             
-            // Allow processing only if cart has items and cash tendered is sufficient (or exactly equal)
-            processBtn.disabled = cart.length === 0 || changeDue < -0.01; 
+            // If payment method is GCash, don't require cash tendered
+            if (paymentMethod === 'GCash') {
+                processBtn.disabled = cart.length === 0;
+                document.getElementById('change-due').textContent = '₱0.00';
+            } else {
+                // Cash payment: require sufficient cash
+                processBtn.disabled = cart.length === 0 || changeDue < -0.01;
+            }
             
             const emptyMsg = document.getElementById('empty-cart-message');
             if (emptyMsg) emptyMsg.style.display = cart.length === 0 ? 'block' : 'none';
 
             renderCart();
             updateOverrideUI(); 
+        }
+        
+        function updateGCashQRCode(totalAmount) {
+            // Just update the amount text below the QR code
+            document.getElementById('gcash-amount').textContent = `₱${totalAmount.toFixed(2)}`;
         }
         
         function updateOverrideUI() {
@@ -634,6 +696,31 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
                 `;
                 list.appendChild(itemElement);
             });
+        }
+        
+        // --- PAYMENT METHOD HANDLERS ---
+        function handlePaymentMethodChange() {
+            const cashRadio = document.getElementById('cash');
+            const gcashRadio = document.getElementById('gcash');
+            const cashTenderedSection = document.getElementById('cash-tendered-section');
+            const qrContainer = document.getElementById('gcash-qr-container');
+            
+            if (cashRadio.checked) {
+                paymentMethod = 'Cash';
+                cashTenderedSection.style.display = 'block';
+                qrContainer.style.display = 'none';
+                // Enable cash tendered input
+                document.getElementById('cash-tendered').disabled = false;
+            } else if (gcashRadio.checked) {
+                paymentMethod = 'GCash';
+                cashTenderedSection.style.display = 'none';
+                qrContainer.style.display = 'block';
+                // Disable cash tendered input for GCash
+                document.getElementById('cash-tendered').disabled = true;
+                document.getElementById('cash-tendered').value = '0.00';
+            }
+            
+            calculateTotals(); // Recalculate to update button state
         }
         
         // --- CART/MODIFIER HANDLERS ---
@@ -812,13 +899,19 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
             const totalAmount = subtotal - discountAmount;
             
             const cashTendered = parseFloat(document.getElementById('cash-tendered').value) || 0;
-            const changeDue = cashTendered - totalAmount;
+            let changeDue = cashTendered - totalAmount;
             
-            if (changeDue < -0.01) {
+            // Payment method validation
+            if (paymentMethod === 'Cash' && changeDue < -0.01) {
                  alert(`Error: Cash tendered is insufficient. Required: ₱${totalAmount.toFixed(2)}`);
                  processBtn.disabled = false;
                  processBtn.textContent = 'Process Order';
                  return;
+            }
+            
+            // For GCash, change is always 0
+            if (paymentMethod === 'GCash') {
+                changeDue = 0;
             }
             
             const orderData = {
@@ -827,6 +920,7 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
                 discountRate: currentDiscountRate,
                 discountAmount: discountAmount,
                 totalAmount: totalAmount,
+                paymentMethod: paymentMethod, // Include payment method
                 cashTendered: cashTendered, 
                 changeDue: changeDue,       
             };
@@ -864,6 +958,8 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
             
             document.getElementById('discount-none').checked = true; 
             document.getElementById('cash-tendered').value = '0.00'; 
+            document.getElementById('cash').checked = true;
+            handlePaymentMethodChange(); // Reset to cash
             
             // Only clear the timestamp if it's not an Admin, or if we are forced to clear server state
             if (!IS_ADMIN && clearServerOverride) {
@@ -929,6 +1025,12 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
                     <div class="receipt-separator"></div>
 
                     <div class="receipt-item-line">
+                        <span>Payment Method:</span>
+                        <span><strong>${orderData.paymentMethod}</strong></span>
+                    </div>
+                    
+                    ${orderData.paymentMethod === 'Cash' ? `
+                    <div class="receipt-item-line">
                         <span>Cash Tendered:</span>
                         <span>₱${orderData.cashTendered.toFixed(2)}</span>
                     </div>
@@ -936,6 +1038,12 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
                         <span>CHANGE:</span>
                         <span>₱${orderData.changeDue.toFixed(2)}</span>
                     </div>
+                    ` : `
+                    <div class="receipt-item-line">
+                        <span>Payment Status:</span>
+                        <span><strong>PAID VIA GCASH</strong></span>
+                    </div>
+                    `}
 
                     <div class="receipt-separator"></div>
                     <div class="receipt-footer">
@@ -962,10 +1070,14 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
             
             document.getElementById('cash-tendered').addEventListener('input', calculateTotals);
 
+            // Payment method change listeners
+            document.querySelectorAll('input[name="payment-method"]').forEach(radio => {
+                radio.addEventListener('change', handlePaymentMethodChange);
+            });
+
             document.querySelectorAll('.discount-type').forEach(radio => {
                 radio.addEventListener('change', handleDiscountChange);
             });
-            // Custom discount input is removed, so no need to listen for its input.
 
             document.getElementById('authorize-override-btn')?.addEventListener('click', handleAdminOverride);
             document.getElementById('process-order-btn').addEventListener('click', processOrder);
@@ -979,6 +1091,9 @@ $override_active_on_load = ($override_time > 0) && (time() - $override_time < 30
             if (!IS_ADMIN) {
                 setInterval(updateOverrideUI, 5000); 
             }
+            
+            // Initialize payment method UI
+            handlePaymentMethodChange();
         });
     </script>
 </body>
